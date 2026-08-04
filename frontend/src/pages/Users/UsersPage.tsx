@@ -66,36 +66,20 @@ export function UsersPage() {
         <table className="w-full text-sm">
           <thead className="bg-table-head text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
             <tr>
+              <th className="px-4 py-3">S.No</th>
+              <th className="px-4 py-3" />
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Contact</th>
               <th className="px-4 py-3">Role</th>
               <th className="px-4 py-3">Region</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Permissions</th>
-              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
-            {users?.map((user) => (
+            {users?.map((user, index) => (
               <tr key={user.id} className="border-t border-border">
-                <td className="px-4 py-3 font-medium text-text-primary">{user.name}</td>
-                <td className="px-4 py-3 text-text-muted">{user.email ?? user.phone ?? user.username ?? '—'}</td>
-                <td className="px-4 py-3 text-text-muted">{roleLabels[user.role]}</td>
-                <td className="px-4 py-3 text-text-muted">{user.region ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <Badge tone={STATUS_TONE[user.status]}>{user.status.replace('_', ' ')}</Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {user.permissions.length
-                      ? user.permissions.map((p) => (
-                          <Badge key={p} tone="blue">
-                            {PERMISSION_LABELS[p]}
-                          </Badge>
-                        ))
-                      : <span className="text-text-faint">—</span>}
-                  </div>
-                </td>
+                <td className="px-4 py-3 text-text-muted">{index + 1}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-start gap-3">
                     <button
@@ -114,6 +98,24 @@ export function UsersPage() {
                     >
                       <KeyRound className="h-4 w-4" />
                     </button>
+                  </div>
+                </td>
+                <td className="px-4 py-3 font-medium text-text-primary">{user.name}</td>
+                <td className="px-4 py-3 text-text-muted">{user.email ?? user.phone ?? user.username ?? '—'}</td>
+                <td className="px-4 py-3 text-text-muted">{roleLabels[user.role]}</td>
+                <td className="px-4 py-3 text-text-muted">{user.region ?? '—'}</td>
+                <td className="px-4 py-3">
+                  <Badge tone={STATUS_TONE[user.status]}>{user.status.replace('_', ' ')}</Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {user.permissions.length
+                      ? user.permissions.map((p) => (
+                          <Badge key={p} tone="blue">
+                            {PERMISSION_LABELS[p]}
+                          </Badge>
+                        ))
+                      : <span className="text-text-faint">—</span>}
                   </div>
                 </td>
               </tr>
