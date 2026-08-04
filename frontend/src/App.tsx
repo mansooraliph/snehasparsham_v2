@@ -19,7 +19,7 @@ export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
-  const homePath = isAuthenticated ? (user ? ROLE_DASHBOARD_PATH[user.role] : null) : '/login';
+  const homePath = isAuthenticated ? (user ? ROLE_DASHBOARD_PATH[user.role] : null) : '/events';
 
   useEffect(() => {
     if (isAuthenticated) fetchMe();
