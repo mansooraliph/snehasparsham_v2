@@ -13,12 +13,14 @@ import { EventFormField } from './database/entities/event-form-field.entity';
 import { EventResponse } from './database/entities/event-response.entity';
 import { EventResponseValue } from './database/entities/event-response-value.entity';
 import { ResponseStatus } from './database/entities/response-status.entity';
+import { RoleLabel } from './database/entities/role-label.entity';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { EventsModule } from './modules/events/events.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ResponseStatusesModule } from './modules/response-statuses/response-statuses.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { RoleLabelsModule } from './modules/role-labels/role-labels.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -42,6 +44,7 @@ import { AppService } from './app.service';
         EventResponse,
         EventResponseValue,
         ResponseStatus,
+        RoleLabel,
       ],
       synchronize: process.env.NODE_ENV !== 'production',
     }),
@@ -51,6 +54,7 @@ import { AppService } from './app.service';
     UploadsModule,
     ResponseStatusesModule,
     DashboardModule,
+    RoleLabelsModule,
   ],
   controllers: [AppController],
   providers: [

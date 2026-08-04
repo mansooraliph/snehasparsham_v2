@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { usersApi } from '@/api/users.api';
 import { getApiErrorMessage } from '@/api/http';
-import { ROLE_LABELS } from '@/types/auth';
+import { useRoleLabelsStore } from '@/stores/useRoleLabelsStore';
 import { PERMISSION_LABELS } from '@/types/permission';
 import { UserFormDrawer } from './UserFormDrawer';
 import type { UserRecord, UserStatus } from '@/types/user';
@@ -16,6 +16,7 @@ const STATUS_TONE: Record<UserStatus, 'green' | 'red' | 'amber'> = {
 };
 
 export function UsersPage() {
+  const roleLabels = useRoleLabelsStore((s) => s.labels);
   const [users, setUsers] = useState<UserRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerUser, setDrawerUser] = useState<UserRecord | 'new' | null>(null);
@@ -64,7 +65,7 @@ export function UsersPage() {
               <tr key={user.id} className="border-t border-border">
                 <td className="px-4 py-3 font-medium text-text-primary">{user.name}</td>
                 <td className="px-4 py-3 text-text-muted">{user.email ?? user.phone ?? '—'}</td>
-                <td className="px-4 py-3 text-text-muted">{ROLE_LABELS[user.role]}</td>
+                <td className="px-4 py-3 text-text-muted">{roleLabels[user.role]}</td>
                 <td className="px-4 py-3 text-text-muted">{user.region ?? '—'}</td>
                 <td className="px-4 py-3">
                   <Badge tone={STATUS_TONE[user.status]}>{user.status.replace('_', ' ')}</Badge>

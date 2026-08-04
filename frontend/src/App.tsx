@@ -15,16 +15,21 @@ import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { AppLayout } from '@/layout/AppLayout';
 import { PublicLayout } from '@/layout/PublicLayout';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useRoleLabelsStore } from '@/stores/useRoleLabelsStore';
 import { ROLE_DASHBOARD_PATH } from '@/types/auth';
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
+  const loadRoleLabels = useRoleLabelsStore((s) => s.load);
   const homePath = isAuthenticated ? (user ? ROLE_DASHBOARD_PATH[user.role] : null) : '/events';
 
   useEffect(() => {
-    if (isAuthenticated) fetchMe();
+    if (isAuthenticated) {
+      fetchMe();
+      loadRoleLabels();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

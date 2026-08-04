@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Input';
 import { usersApi } from '@/api/users.api';
 import { getApiErrorMessage } from '@/api/http';
-import { ROLE_LABELS } from '@/types/auth';
+import { useRoleLabelsStore } from '@/stores/useRoleLabelsStore';
 import type { Role } from '@/types/auth';
 import { ALL_PERMISSIONS, PERMISSION_LABELS } from '@/types/permission';
 import type { Permission } from '@/types/permission';
@@ -36,6 +36,7 @@ interface UserFormDrawerProps {
 }
 
 export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerProps) {
+  const roleLabels = useRoleLabelsStore((s) => s.labels);
   const isEdit = !!user;
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
@@ -131,7 +132,7 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
             >
               {ROLE_OPTIONS.map((r) => (
                 <option key={r} value={r}>
-                  {ROLE_LABELS[r]}
+                  {roleLabels[r]}
                 </option>
               ))}
             </select>

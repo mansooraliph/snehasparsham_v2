@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { Check, Pencil, ShieldCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import { usersApi } from '@/api/users.api';
 import { getApiErrorMessage } from '@/api/http';
-import { ROLE_LABELS } from '@/types/auth';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useRoleLabelsStore } from '@/stores/useRoleLabelsStore';
 import type { Role } from '@/types/auth';
 import { PERMISSION_LABELS } from '@/types/permission';
 import { PermissionsDrawer } from './PermissionsDrawer';
@@ -17,8 +19,8 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'permissions', label: 'Permission Grants' },
 ];
 
-/** disaster-management-portal-full.md §2 — fixed role table; roles themselves
- *  aren't user-configurable, only the extra permission grants on top of them are. */
+/** disaster-management-portal-full.md §2 — fixed role table and the capabilities
+ *  each grants; only the display label shown in the UI can be renamed. */
 const ROLE_DESCRIPTIONS: Record<Role, string> = {
   super_admin: 'Full system control: manages users, roles, permissions, and system configuration.',
   district_state_admin: 'Manages disasters, resources, and teams within an assigned region.',
@@ -45,6 +47,14 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<UserRecord | null>(null);
 
+  const currentRole = useAuthStore((s) => s.user?.role);
+  const canRenameRoles = currentRole === 'super_admin';
+  const roleLabels = useRoleLabelsStore((s) => s.labels);
+  const setRoleLabel = useRoleLabelsStore((s) => s.setLabel);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [isSavingLabel, setIsSavingLabel] = useState(false);
+
   function loadUsers() {
     usersApi
       .list()
@@ -57,6 +67,26 @@ export function SettingsPage() {
   function handleSaved(updated: UserRecord) {
     setUsers((prev) => prev?.map((u) => (u.id === updated.id ? updated : u)) ?? prev);
     setPermissionsUser(null);
+  }
+
+  function startEditingLabel(role: Role) {
+    setEditingRole(role);
+    setEditValue(roleLabels[role]);
+    setError(null);
+  }
+
+  async function saveLabel(role: Role) {
+    const trimmed = editValue.trim();
+    if (!trimmed) return;
+    setIsSavingLabel(true);
+    try {
+      await setRoleLabel(role, trimmed);
+      setEditingRole(null);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not rename role'));
+    } finally {
+      setIsSavingLabel(false);
+    }
   }
 
   return (
@@ -85,8 +115,9 @@ export function SettingsPage() {
           <div>
             <h2 className="text-base font-semibold text-text-primary">Roles</h2>
             <p className="text-sm text-text-muted">
-              The portal's roles are fixed by design — each grants a default set of capabilities. Use the
-              Permission Grants tab to give a specific user extra access beyond their role.
+              The portal's roles and the capabilities each grants are fixed by design — but the label shown
+              in the UI can be renamed{canRenameRoles ? '' : ' by a Super Admin'}. Use the Permission Grants
+              tab to give a specific user extra access beyond their role.
             </p>
           </div>
 
@@ -96,13 +127,62 @@ export function SettingsPage() {
                 <tr>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Description</th>
+                  {canRenameRoles && <th className="px-4 py-3" />}
                 </tr>
               </thead>
               <tbody>
                 {ROLE_ORDER.map((role) => (
                   <tr key={role} className="border-t border-border">
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-text-primary">{ROLE_LABELS[role]}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-text-primary">
+                      {editingRole === role ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            autoFocus
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveLabel(role);
+                              if (e.key === 'Escape') setEditingRole(null);
+                            }}
+                            className="h-8 w-48"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => saveLabel(role)}
+                            disabled={isSavingLabel}
+                            aria-label="Save"
+                            className="text-green hover:text-green/80 disabled:opacity-50"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingRole(null)}
+                            aria-label="Cancel"
+                            className="text-text-faint hover:text-text-primary"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        roleLabels[role]
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-text-muted">{ROLE_DESCRIPTIONS[role]}</td>
+                    {canRenameRoles && (
+                      <td className="px-4 py-3">
+                        {editingRole !== role && (
+                          <button
+                            type="button"
+                            onClick={() => startEditingLabel(role)}
+                            aria-label="Rename role label"
+                            className="text-text-faint hover:text-blue"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -142,7 +222,7 @@ export function SettingsPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3 font-medium text-text-primary">{user.name}</td>
-                    <td className="px-4 py-3 text-text-muted">{ROLE_LABELS[user.role]}</td>
+                    <td className="px-4 py-3 text-text-muted">{roleLabels[user.role]}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {user.permissions.length

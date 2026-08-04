@@ -3,7 +3,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { Button } from '@/components/ui/Button';
 import { usersApi } from '@/api/users.api';
 import { getApiErrorMessage } from '@/api/http';
-import { ROLE_LABELS } from '@/types/auth';
+import { useRoleLabelsStore } from '@/stores/useRoleLabelsStore';
 import { ALL_PERMISSIONS, PERMISSION_LABELS } from '@/types/permission';
 import type { Permission } from '@/types/permission';
 import type { UserRecord } from '@/types/user';
@@ -18,6 +18,7 @@ interface PermissionsDrawerProps {
 /** Focused editor for one user's extra permission grants — the role itself is
  *  fixed (see role.enum.ts); this only touches the `permissions` override array. */
 export function PermissionsDrawer({ open, user, onClose, onSaved }: PermissionsDrawerProps) {
+  const roleLabels = useRoleLabelsStore((s) => s.labels);
   const [permissions, setPermissions] = useState<Permission[]>(user?.permissions ?? []);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export function PermissionsDrawer({ open, user, onClose, onSaved }: PermissionsD
         <div className="space-y-4">
           <div>
             <p className="text-sm font-medium text-text-primary">{user.name}</p>
-            <p className="text-sm text-text-muted">{ROLE_LABELS[user.role]}</p>
+            <p className="text-sm text-text-muted">{roleLabels[user.role]}</p>
           </div>
 
           <div className="space-y-1.5">
@@ -67,7 +68,7 @@ export function PermissionsDrawer({ open, user, onClose, onSaved }: PermissionsD
             ))}
           </div>
           <p className="text-xs text-text-faint">
-            Grants a capability on top of what {ROLE_LABELS[user.role]} already has by default.
+            Grants a capability on top of what {roleLabels[user.role]} already has by default.
           </p>
 
           {error && <p className="text-sm text-red">{error}</p>}
