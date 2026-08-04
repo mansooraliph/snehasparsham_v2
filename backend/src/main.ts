@@ -11,6 +11,12 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Behind nginx in production — without this, every request appears to come
+  // from the proxy's own IP, so the login/OTP throttle guard (5 per 15 min)
+  // pools ALL users into one bucket and locks everyone out after a handful of
+  // site-wide attempts instead of limiting per real client IP.
+  app.set('trust proxy', 1);
+
   // Uploaded posters etc. — served outside the /api prefix, plain static files.
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
