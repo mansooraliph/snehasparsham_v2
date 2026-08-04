@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { Drawer } from '@/components/ui/Drawer';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { FieldInput } from '@/components/events/FieldInput';
 import { eventResponsesApi } from '@/api/eventResponses.api';
 import type { AdminResponseRow } from '@/api/eventResponses.api';
@@ -24,20 +25,31 @@ interface ResponseDetailDrawerProps {
   eventId: string;
   fields: EventFormFieldRecord[];
   response: AdminResponseRow | null;
+  /** Opens straight into edit mode — used by the table's dedicated Edit action. */
+  initialEditing?: boolean;
   onClose: () => void;
   onSaved: (response: AdminResponseRow) => void;
 }
 
-export function ResponseDetailDrawer({ open, eventId, fields, response, onClose, onSaved }: ResponseDetailDrawerProps) {
-  const [isEditing, setIsEditing] = useState(false);
+export function ResponseDetailDrawer({
+  open,
+  eventId,
+  fields,
+  response,
+  initialEditing = false,
+  onClose,
+  onSaved,
+}: ResponseDetailDrawerProps) {
+  const [isEditing, setIsEditing] = useState(initialEditing);
   const [values, setValues] = useState<Record<string, EventFieldValue>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (response) setValues(response.values);
-    setIsEditing(false);
+    setIsEditing(initialEditing);
     setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response]);
 
   function resetAndClose() {
@@ -68,6 +80,10 @@ export function ResponseDetailDrawer({ open, eventId, fields, response, onClose,
           <div>
             <p className="font-mono text-sm font-semibold text-text-primary">{response.referenceNumber}</p>
             <p className="text-sm text-text-muted">Submitted {new Date(response.submittedAt).toLocaleString()}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted">
+              {response.status ? <Badge tone={response.status.tone}>{response.status.name}</Badge> : <Badge>No status</Badge>}
+              <span>{response.assignee ? `Assigned to ${response.assignee.name}` : 'Unassigned'}</span>
+            </div>
           </div>
 
           <div className="space-y-4">

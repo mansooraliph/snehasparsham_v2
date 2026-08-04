@@ -1,13 +1,14 @@
 import { http } from './http';
 import type { EventFieldValue } from '@/types/eventField';
 import type { EventFormFieldRecord } from '@/types/eventField';
+import type { ResponseStatusTone } from '@/types/responseStatus';
 
 export interface AdminResponseRow {
   id: string;
   referenceNumber: string;
   submittedAt: string;
   values: Record<string, EventFieldValue>;
-  status: { id: string; name: string; tone: string } | null;
+  status: { id: string; name: string; tone: ResponseStatusTone } | null;
   assignee: { id: string; name: string } | null;
 }
 

@@ -53,6 +53,7 @@ export default function App() {
           <Route path="/admin/events/:id/fields" element={<EventFieldsPage />} />
           <Route path="/admin/events/:id/responses" element={<EventResponsesPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/response-statuses" element={<ResponseStatusesPage />} />
         </Route>
       </Route>
 

@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Download, Eye, MessageCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { eventsApi } from '@/api/events.api';
 import { eventResponsesApi } from '@/api/eventResponses.api';
 import type { AdminResponseRow, EventResponsesListing } from '@/api/eventResponses.api';
+import { responseStatusesApi } from '@/api/responseStatuses.api';
+import { usersApi } from '@/api/users.api';
 import { getApiErrorMessage } from '@/api/http';
 import { ResponseDetailDrawer } from './ResponseDetailDrawer';
 import { WhatsAppMessageModal } from './WhatsAppMessageModal';
 import type { EventFieldValue } from '@/types/eventField';
 import type { EventRecord } from '@/types/event';
+import type { ResponseStatusRecord } from '@/types/responseStatus';
+import type { UserRecord } from '@/types/user';
 
 function formatCell(value: EventFieldValue | undefined): string {
   if (value === undefined || value === null) return '';
@@ -27,20 +32,43 @@ export function EventResponsesPage() {
   const navigate = useNavigate();
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [listing, setListing] = useState<EventResponsesListing | null>(null);
+  const [statuses, setStatuses] = useState<ResponseStatusRecord[]>([]);
+  const [users, setUsers] = useState<UserRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<AdminResponseRow | null>(null);
+  const [drawerInitialEditing, setDrawerInitialEditing] = useState(false);
   const [whatsAppResponse, setWhatsAppResponse] = useState<AdminResponseRow | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([eventsApi.get(id), eventResponsesApi.listForEvent(id)])
-      .then(([e, l]) => {
+    Promise.all([eventsApi.get(id), eventResponsesApi.listForEvent(id), responseStatusesApi.list(), usersApi.list()])
+      .then(([e, l, s, u]) => {
         setEvent(e);
         setListing(l);
+        setStatuses(s);
+        setUsers(u);
       })
       .catch((err) => setError(getApiErrorMessage(err, 'Could not load responses')));
   }, [id]);
+
+  function patchResponse(updated: AdminResponseRow) {
+    setListing((prev) =>
+      prev ? { ...prev, responses: prev.responses.map((r) => (r.id === updated.id ? updated : r)) } : prev,
+    );
+  }
+
+  async function handleStatusChange(response: AdminResponseRow, statusId: string) {
+    if (!id) return;
+    const updated = await eventResponsesApi.setStatus(id, response.id, statusId || null);
+    patchResponse(updated);
+  }
+
+  async function handleAssigneeChange(response: AdminResponseRow, userId: string) {
+    if (!id) return;
+    const updated = await eventResponsesApi.setAssignee(id, response.id, userId || null);
+    patchResponse(updated);
+  }
 
   async function handleExport() {
     if (!id || !event) return;
@@ -52,6 +80,11 @@ export function EventResponsesPage() {
     } finally {
       setIsExporting(false);
     }
+  }
+
+  function openDrawer(response: AdminResponseRow, editing: boolean) {
+    setSelectedResponse(response);
+    setDrawerInitialEditing(editing);
   }
 
   if (error) return <p className="text-sm text-red">{error}</p>;
@@ -91,36 +124,80 @@ export function EventResponsesPage() {
                   {field.label}
                 </th>
               ))}
+              <th className="whitespace-nowrap px-4 py-3">Status</th>
+              <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
               <th className="whitespace-nowrap px-4 py-3">Submitted At</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {listing?.responses.map((response) => (
-              <tr
-                key={response.id}
-                onClick={() => setSelectedResponse(response)}
-                className="cursor-pointer border-t border-border hover:bg-table-head"
-              >
+              <tr key={response.id} className="border-t border-border hover:bg-table-head">
                 <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted">{response.referenceNumber}</td>
                 {listing.fields.map((field) => (
                   <td key={field.id} className="px-4 py-3 text-text-primary">
                     {formatCell(response.values[field.id])}
                   </td>
                 ))}
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
+                    <select
+                      value={response.status?.id ?? ''}
+                      onChange={(e) => handleStatusChange(response, e.target.value)}
+                      className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                    >
+                      <option value="">—</option>
+                      {statuses.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <select
+                    value={response.assignee?.id ?? ''}
+                    onChange={(e) => handleAssigneeChange(response, e.target.value)}
+                    className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
                 <td className="px-4 py-3 text-text-muted">{new Date(response.submittedAt).toLocaleString()}</td>
                 <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setWhatsAppResponse(response);
-                    }}
-                    aria-label="Share on WhatsApp"
-                    className="text-text-faint hover:text-green"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </button>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => openDrawer(response, false)}
+                      aria-label="View response"
+                      className="text-text-faint hover:text-blue"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openDrawer(response, true)}
+                      aria-label="Edit response"
+                      className="text-text-faint hover:text-blue"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWhatsAppResponse(response)}
+                      aria-label="Share on WhatsApp"
+                      className="text-text-faint hover:text-green"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -138,14 +215,11 @@ export function EventResponsesPage() {
         eventId={id ?? ''}
         fields={listing?.fields ?? []}
         response={selectedResponse}
+        initialEditing={drawerInitialEditing}
         onClose={() => setSelectedResponse(null)}
         onSaved={(updated) => {
           setSelectedResponse(updated);
-          setListing((prev) =>
-            prev
-              ? { ...prev, responses: prev.responses.map((r) => (r.id === updated.id ? updated : r)) }
-              : prev,
-          );
+          patchResponse(updated);
         }}
       />
 
