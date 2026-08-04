@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -9,6 +9,7 @@ import { EventResponsesService } from './event-responses.service';
 import { SubmitEventResponseDto } from './dto/submit-event-response.dto';
 import { SetResponseStatusDto } from './dto/set-response-status.dto';
 import { AssignResponseDto } from './dto/assign-response.dto';
+import { BulkDeleteResponsesDto } from './dto/bulk-delete-responses.dto';
 
 const EVENT_ADMIN_ROLES = [Role.SUPER_ADMIN, Role.DISTRICT_STATE_ADMIN];
 
@@ -60,6 +61,21 @@ export class EventResponsesController {
     @Body() dto: AssignResponseDto,
   ) {
     return this.responses.setAssignee(eventId, responseId, dto.userId ?? null);
+  }
+
+  @Roles(...EVENT_ADMIN_ROLES)
+  @RequirePermissions(Permission.MANAGE_RESPONSES)
+  @Post('bulk-delete')
+  @HttpCode(HttpStatus.OK)
+  bulkRemove(@Param('eventId') eventId: string, @Body() dto: BulkDeleteResponsesDto) {
+    return this.responses.bulkRemove(eventId, dto.responseIds);
+  }
+
+  @Roles(...EVENT_ADMIN_ROLES)
+  @RequirePermissions(Permission.MANAGE_RESPONSES)
+  @Delete(':responseId')
+  remove(@Param('eventId') eventId: string, @Param('responseId') responseId: string) {
+    return this.responses.remove(eventId, responseId);
   }
 
   @Roles(...EVENT_ADMIN_ROLES)

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListChecks, Pencil, Plus, Users } from 'lucide-react';
+import { ListChecks, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { eventsApi } from '@/api/events.api';
 import { getApiErrorMessage } from '@/api/http';
 import { EventFormDrawer } from './EventFormDrawer';
@@ -20,6 +21,7 @@ export function EventsPage() {
   const [events, setEvents] = useState<EventRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerEvent, setDrawerEvent] = useState<EventRecord | 'new' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EventRecord | null>(null);
 
   function loadEvents() {
     eventsApi
@@ -35,6 +37,17 @@ export function EventsPage() {
     setDrawerEvent(null);
     loadEvents();
     if (wasCreate) navigate(`/admin/events/${saved.id}/fields`);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await eventsApi.remove(deleteTarget.id);
+      setEvents((prev) => prev?.filter((e) => e.id !== deleteTarget.id) ?? prev);
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not delete event'));
+    }
   }
 
   return (
@@ -93,6 +106,14 @@ export function EventsPage() {
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(event)}
+                      aria-label="Delete event"
+                      className="text-text-faint hover:text-red"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </td>
                 <td className="px-4 py-3 font-medium text-text-primary">{event.name}</td>
@@ -124,6 +145,18 @@ export function EventsPage() {
         event={drawerEvent === 'new' || drawerEvent === null ? undefined : drawerEvent}
         onClose={() => setDrawerEvent(null)}
         onSaved={handleSaved}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this event?"
+        message={
+          deleteTarget
+            ? `"${deleteTarget.name}" and all of its form fields and responses will be permanently deleted. This can't be undone.`
+            : ''
+        }
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

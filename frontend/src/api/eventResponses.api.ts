@@ -40,6 +40,14 @@ export const eventResponsesApi = {
       .patch<AdminResponseRow>(`/events/${eventId}/responses/${responseId}/assign`, { userId })
       .then((r) => r.data),
 
+  remove: (eventId: string, responseId: string) =>
+    http.delete<void>(`/events/${eventId}/responses/${responseId}`).then((r) => r.data),
+
+  bulkRemove: (eventId: string, responseIds: string[]) =>
+    http
+      .post<{ deleted: number }>(`/events/${eventId}/responses/bulk-delete`, { responseIds })
+      .then((r) => r.data),
+
   /** Triggers a CSV file download via a plain navigation (auth header can't ride along
    *  a `<a download>` click, so this fetches as a blob and saves it client-side). */
   async downloadCsv(eventId: string, filename: string): Promise<void> {

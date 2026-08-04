@@ -8,6 +8,7 @@ import { EventFieldsPage } from '@/pages/Events/EventFieldsPage';
 import { EventResponsesPage } from '@/pages/Events/EventResponsesPage';
 import { UsersPage } from '@/pages/Users/UsersPage';
 import { ResponseStatusesPage } from '@/pages/ResponseStatuses/ResponseStatusesPage';
+import { SettingsPage } from '@/pages/Settings/SettingsPage';
 import { PublicEventsListPage } from '@/pages/PublicEvents/PublicEventsListPage';
 import { PublicEventDetailPage } from '@/pages/PublicEvents/PublicEventDetailPage';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/admin/events/:id/responses" element={<EventResponsesPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/admin/response-statuses" element={<ResponseStatusesPage />} />
+          <Route path="/admin/settings" element={<SettingsPage />} />
         </Route>
       </Route>
 

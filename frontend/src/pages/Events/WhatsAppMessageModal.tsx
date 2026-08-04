@@ -71,7 +71,7 @@ export function WhatsAppMessageModal({ event, fields, response, onClose }: Whats
           </p>
         )}
 
-        <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} />
+        <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={10} />
 
         <div className="mt-4 flex justify-end gap-3">
           <Button variant="outline" onClick={onClose}>

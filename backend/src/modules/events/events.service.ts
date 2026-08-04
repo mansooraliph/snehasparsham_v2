@@ -1,7 +1,10 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, MoreThanOrEqual, Repository } from 'typeorm';
 import { Event } from '../../database/entities/event.entity';
+import { EventFormField } from '../../database/entities/event-form-field.entity';
+import { EventResponse } from '../../database/entities/event-response.entity';
+import { EventResponseValue } from '../../database/entities/event-response-value.entity';
 import { EventStatus } from '../../common/enums/event-status.enum';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -11,6 +14,8 @@ export class EventsService {
   constructor(
     @InjectRepository(Event)
     private readonly events: Repository<Event>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   create(dto: CreateEventDto, createdBy: string): Promise<Event> {
@@ -85,10 +90,23 @@ export class EventsService {
     return this.events.save(event);
   }
 
+  /** Cascades manually — these entities use plain string FK columns, not TypeORM
+   *  relations, so the DB has no ON DELETE CASCADE to lean on. */
   async remove(id: string, requesterId: string): Promise<void> {
     const event = await this.findOne(id);
     this.assertOwnerOrElevated(event, requesterId);
-    await this.events.remove(event);
+
+    await this.dataSource.transaction(async (manager) => {
+      const responseIds = (await manager.find(EventResponse, { where: { event_id: id }, select: { id: true } })).map(
+        (r) => r.id,
+      );
+      if (responseIds.length) {
+        await manager.delete(EventResponseValue, { response_id: In(responseIds) });
+        await manager.delete(EventResponse, { id: In(responseIds) });
+      }
+      await manager.delete(EventFormField, { event_id: id });
+      await manager.delete(Event, { id });
+    });
   }
 
   /** Clone an event (events-registration-module.md §3.5) — form structure carries

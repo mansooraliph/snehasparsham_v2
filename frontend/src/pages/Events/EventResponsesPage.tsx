@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Eye, MessageCircle, Pencil, Search } from 'lucide-react';
+import { ArrowLeft, Download, Eye, MessageCircle, Pencil, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { eventsApi } from '@/api/events.api';
 import { eventResponsesApi } from '@/api/eventResponses.api';
 import type { AdminResponseRow, EventResponsesListing } from '@/api/eventResponses.api';
@@ -42,6 +43,8 @@ export function EventResponsesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<AdminResponseRow | 'bulk' | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -90,6 +93,40 @@ export function EventResponsesPage() {
     setDrawerInitialEditing(editing);
   }
 
+  function toggleSelected(responseId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(responseId)) next.delete(responseId);
+      else next.add(responseId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) =>
+      prev.size === filteredResponses.length ? new Set() : new Set(filteredResponses.map((r) => r.id)),
+    );
+  }
+
+  async function handleConfirmDelete() {
+    if (!id || !deleteTarget) return;
+    if (deleteTarget === 'bulk') {
+      const ids = [...selectedIds];
+      await eventResponsesApi.bulkRemove(id, ids);
+      setListing((prev) => (prev ? { ...prev, responses: prev.responses.filter((r) => !selectedIds.has(r.id)) } : prev));
+      setSelectedIds(new Set());
+    } else {
+      await eventResponsesApi.remove(id, deleteTarget.id);
+      setListing((prev) => (prev ? { ...prev, responses: prev.responses.filter((r) => r.id !== deleteTarget.id) } : prev));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget.id);
+        return next;
+      });
+    }
+    setDeleteTarget(null);
+  }
+
   const filteredResponses = useMemo(() => {
     if (!listing) return [];
     const q = search.trim().toLowerCase();
@@ -127,10 +164,18 @@ export function EventResponsesPage() {
             {event?.max_participants ? ` · limit ${event.max_participants}` : ''}
           </p>
         </div>
-        <Button variant="outline" onClick={handleExport} loading={isExporting} disabled={!listing?.responses.length}>
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-3">
+          {selectedIds.size > 0 && (
+            <Button variant="destructive" onClick={() => setDeleteTarget('bulk')}>
+              <Trash2 className="h-4 w-4" />
+              Delete {selectedIds.size} selected
+            </Button>
+          )}
+          <Button variant="outline" onClick={handleExport} loading={isExporting} disabled={!listing?.responses.length}>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -187,6 +232,15 @@ export function EventResponsesPage() {
         <table className="w-full text-sm">
           <thead className="bg-table-head text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
             <tr>
+              <th className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={filteredResponses.length > 0 && selectedIds.size === filteredResponses.length}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all"
+                  className="rounded text-blue focus:ring-blue"
+                />
+              </th>
               <th className="px-4 py-3">S.No</th>
               <th className="px-4 py-3" />
               <th className="whitespace-nowrap px-4 py-3">Status</th>
@@ -203,6 +257,15 @@ export function EventResponsesPage() {
           <tbody>
             {filteredResponses.map((response, index) => (
               <tr key={response.id} className="border-t border-border hover:bg-table-head">
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(response.id)}
+                    onChange={() => toggleSelected(response.id)}
+                    aria-label="Select response"
+                    className="rounded text-blue focus:ring-blue"
+                  />
+                </td>
                 <td className="px-4 py-3 text-text-muted">{index + 1}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-start gap-3">
@@ -229,6 +292,14 @@ export function EventResponsesPage() {
                       className="text-text-faint hover:text-green"
                     >
                       <MessageCircle className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(response)}
+                      aria-label="Delete response"
+                      className="text-text-faint hover:text-red"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </td>
@@ -305,6 +376,14 @@ export function EventResponsesPage() {
           onClose={() => setWhatsAppResponse(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget === 'bulk' ? `Delete ${selectedIds.size} responses?` : 'Delete this response?'}
+        message="This can't be undone. The submitted answers will be permanently removed."
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

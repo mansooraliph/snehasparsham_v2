@@ -131,6 +131,31 @@ export class EventResponsesService {
     return this.toRow(response, dto.values);
   }
 
+  async remove(eventId: string, responseId: string): Promise<void> {
+    await this.findResponseOrThrow(eventId, responseId);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(EventResponseValue, { response_id: responseId });
+      await manager.delete(EventResponse, { id: responseId });
+    });
+  }
+
+  /** Deletes every response id that actually belongs to this event; silently
+   *  ignores ids that don't (already gone, or from a different event). */
+  async bulkRemove(eventId: string, responseIds: string[]): Promise<{ deleted: number }> {
+    const owned = await this.responses.find({
+      where: { id: In(responseIds), event_id: eventId },
+      select: { id: true },
+    });
+    if (owned.length === 0) return { deleted: 0 };
+    const ids = owned.map((r) => r.id);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(EventResponseValue, { response_id: In(ids) });
+      await manager.delete(EventResponse, { id: In(ids) });
+    });
+    return { deleted: ids.length };
+  }
+
   async setStatus(eventId: string, responseId: string, statusId: string | null): Promise<AdminResponseRow> {
     const response = await this.findResponseOrThrow(eventId, responseId);
     if (statusId) {
