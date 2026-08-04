@@ -13,7 +13,7 @@ export function MobileBottomNav({ onMoreClick }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
-  const items = user ? primaryNavItemsForRole(user.role) : [];
+  const items = user ? primaryNavItemsForRole(user) : [];
 
   return (
     <nav

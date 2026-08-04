@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { Between, DataSource, In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt } from 'crypto';
+import { Event } from '../../database/entities/event.entity';
 import { EventResponse } from '../../database/entities/event-response.entity';
 import { EventResponseValue } from '../../database/entities/event-response-value.entity';
 import { EventFormField } from '../../database/entities/event-form-field.entity';
@@ -20,6 +21,24 @@ export interface AdminResponseRow {
   values: Record<string, EventFieldValue>;
   status: { id: string; name: string; tone: string } | null;
   assignee: { id: string; name: string } | null;
+}
+
+export interface CrossEventResponseRow {
+  id: string;
+  referenceNumber: string;
+  submittedAt: Date;
+  values: Record<string, EventFieldValue>;
+  status: { id: string; name: string; tone: string } | null;
+  assignee: { id: string; name: string } | null;
+  event: { id: string; name: string };
+}
+
+export interface CrossEventResponseFilters {
+  eventId?: string;
+  assigneeId?: string;
+  /** Inclusive, "YYYY-MM-DD". */
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 /** 10-digit numeric code, e.g. "4839201576" — ~9 billion combinations. */
@@ -40,6 +59,8 @@ export class EventResponsesService {
     private readonly statuses: Repository<ResponseStatus>,
     @InjectRepository(User)
     private readonly users: Repository<User>,
+    @InjectRepository(Event)
+    private readonly events: Repository<Event>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly eventsService: EventsService,
@@ -211,6 +232,50 @@ export class EventResponsesService {
     };
   }
 
+  /** Cross-event listing for the global "Responses" admin page — includes field
+   *  values so the same view/edit/WhatsApp actions as the per-event page work
+   *  here too; the frontend fetches each event's field labels on demand. */
+  async findAllAcrossEvents(filters: CrossEventResponseFilters): Promise<CrossEventResponseRow[]> {
+    const where: Record<string, unknown> = {};
+    if (filters.eventId) where.event_id = filters.eventId;
+    if (filters.assigneeId) where.assigned_to = filters.assigneeId;
+    if (filters.dateFrom && filters.dateTo) {
+      where.submitted_at = Between(startOfDay(filters.dateFrom), endOfDay(filters.dateTo));
+    } else if (filters.dateFrom) {
+      where.submitted_at = MoreThanOrEqual(startOfDay(filters.dateFrom));
+    } else if (filters.dateTo) {
+      where.submitted_at = LessThanOrEqual(endOfDay(filters.dateTo));
+    }
+
+    const responses = await this.responses.find({ where, order: { submitted_at: 'DESC' } });
+    if (responses.length === 0) return [];
+
+    const [statusMap, userMap] = await this.lookupMaps(responses);
+    const eventIds = [...new Set(responses.map((r) => r.event_id))];
+    const eventRows = await this.events.find({ where: { id: In(eventIds) }, select: { id: true, name: true } });
+    const eventMap = new Map(eventRows.map((e) => [e.id, { id: e.id, name: e.name }]));
+
+    const allValues = await this.values.find({ where: { response_id: In(responses.map((r) => r.id)) } });
+    const valuesByResponse = new Map<string, EventResponseValue[]>();
+    for (const v of allValues) {
+      const list = valuesByResponse.get(v.response_id) ?? [];
+      list.push(v);
+      valuesByResponse.set(v.response_id, list);
+    }
+
+    return responses.map((r) => ({
+      id: r.id,
+      referenceNumber: r.reference_number,
+      submittedAt: r.submitted_at,
+      values: Object.fromEntries(
+        (valuesByResponse.get(r.id) ?? []).map((v) => [v.field_id, safeParse(v.value)]),
+      ),
+      status: r.status_id ? statusMap.get(r.status_id) ?? null : null,
+      assignee: r.assigned_to ? userMap.get(r.assigned_to) ?? null : null,
+      event: eventMap.get(r.event_id) ?? { id: r.event_id, name: '(deleted event)' },
+    }));
+  }
+
   async exportCsv(eventId: string): Promise<string> {
     const { fields, responses } = await this.findAllForEvent(eventId);
     const header = ['Reference Number', ...fields.map((f) => f.label), 'Status', 'Assigned To', 'Submitted At'];
@@ -314,6 +379,14 @@ export class EventResponsesService {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function startOfDay(dateIso: string): Date {
+  return new Date(`${dateIso}T00:00:00.000Z`);
+}
+
+function endOfDay(dateIso: string): Date {
+  return new Date(`${dateIso}T23:59:59.999Z`);
 }
 
 function safeParse(raw: string): EventFieldValue {

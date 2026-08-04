@@ -112,7 +112,7 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
             />
           </Field>
 
-          <Field label="Username" htmlFor="username" hint="Optional — an alternate login ID besides email/phone">
+          <Field label="Username" htmlFor="username" hint="Optional — an alternate login ID; can be a plain username or an email address">
             <Input
               id="username"
               value={username}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Check, Pencil, ShieldCheck, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Badge } from '@/components/ui/Badge';
@@ -10,13 +11,15 @@ import { useRoleLabelsStore } from '@/stores/useRoleLabelsStore';
 import type { Role } from '@/types/auth';
 import { PERMISSION_LABELS } from '@/types/permission';
 import { PermissionsDrawer } from './PermissionsDrawer';
+import { ResponseStatusesPage } from '../ResponseStatuses/ResponseStatusesPage';
 import type { UserRecord } from '@/types/user';
 
-type SettingsTab = 'roles' | 'permissions';
+type SettingsTab = 'roles' | 'permissions' | 'statuses';
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'roles', label: 'Roles' },
   { key: 'permissions', label: 'Permission Grants' },
+  { key: 'statuses', label: 'Response Statuses' },
 ];
 
 /** disaster-management-portal-full.md §2 — fixed role table and the capabilities
@@ -87,6 +90,13 @@ export function SettingsPage() {
     } finally {
       setIsSavingLabel(false);
     }
+  }
+
+  // Settings (including Response Statuses, moved here from its own nav entry)
+  // is Super Admin-only — the sidebar already only links here for that role;
+  // this closes the gap for anyone who navigates to the URL directly.
+  if (currentRole !== undefined && currentRole !== 'super_admin') {
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -244,6 +254,15 @@ export function SettingsPage() {
             )}
             {users === null && !error && <p className="px-4 py-8 text-center text-sm text-text-muted">Loading…</p>}
           </div>
+        </div>
+      )}
+
+      {tab === 'statuses' && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-text-primary">Response Statuses</h2>
+          </div>
+          <ResponseStatusesPage />
         </div>
       )}
 

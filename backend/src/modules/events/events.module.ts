@@ -12,12 +12,13 @@ import { EventFieldsController } from './event-fields.controller';
 import { EventFieldsService } from './event-fields.service';
 import { EventResponsesController } from './event-responses.controller';
 import { EventResponsesService } from './event-responses.service';
+import { ResponsesController } from './responses.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Event, EventFormField, EventResponse, EventResponseValue, ResponseStatus, User]),
   ],
-  controllers: [EventsController, EventFieldsController, EventResponsesController],
+  controllers: [EventsController, EventFieldsController, EventResponsesController, ResponsesController],
   providers: [EventsService, EventFieldsService, EventResponsesService],
   exports: [EventsService, EventFieldsService, EventResponsesService],
 })

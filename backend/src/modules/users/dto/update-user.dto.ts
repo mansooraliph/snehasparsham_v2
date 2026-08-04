@@ -3,7 +3,8 @@ import { Role, UserStatus } from '../../../common/enums/role.enum';
 import { Permission } from '../../../common/enums/permission.enum';
 
 const PHONE_REGEX = /^\d{10}$/;
-const USERNAME_REGEX = /^[a-zA-Z0-9_.]+$/;
+/** Allows plain usernames as well as an email-shaped one (e.g. reusing their email as the username). */
+const USERNAME_REGEX = /^[a-zA-Z0-9_.@+-]+$/;
 
 export class UpdateUserDto {
   @IsOptional()
@@ -22,7 +23,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @MinLength(3)
-  @Matches(USERNAME_REGEX, { message: 'Username can only contain letters, numbers, "_" and "."' })
+  @Matches(USERNAME_REGEX, { message: 'Username can only contain letters, numbers, and . _ @ + -' })
   username?: string;
 
   /** Admin-initiated password reset — leave unset to keep the current password. */

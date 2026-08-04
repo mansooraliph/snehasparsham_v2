@@ -31,7 +31,7 @@ export function AppSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     navigate('/login', { replace: true });
   }
 
-  const items = user ? navItemsForRole(user.role) : [];
+  const items = user ? navItemsForRole(user) : [];
 
   return (
     <div className="flex h-full flex-col bg-header text-white">

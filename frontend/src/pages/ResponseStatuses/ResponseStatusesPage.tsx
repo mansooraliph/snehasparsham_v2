@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Field, Input } from '@/components/ui/Input';
 import { responseStatusesApi } from '@/api/responseStatuses.api';
 import { getApiErrorMessage } from '@/api/http';
+import { useAuthStore } from '@/stores/useAuthStore';
 import type { ResponseStatusRecord, ResponseStatusTone } from '@/types/responseStatus';
 
 const TONE_OPTIONS: ResponseStatusTone[] = ['neutral', 'blue', 'green', 'amber', 'red'];
 
 export function ResponseStatusesPage() {
+  // Admin-only (moved into Settings) — guards direct navigation too, e.g. a
+  // bookmarked /admin/response-statuses link from before the move.
+  const currentRole = useAuthStore((s) => s.user?.role);
   const [statuses, setStatuses] = useState<ResponseStatusRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -116,6 +121,10 @@ export function ResponseStatusesPage() {
       setError(getApiErrorMessage(err, 'Could not save the new order'));
       setStatuses(orderAtDragStart.current);
     }
+  }
+
+  if (currentRole !== undefined && currentRole !== 'super_admin') {
+    return <Navigate to="/" replace />;
   }
 
   return (

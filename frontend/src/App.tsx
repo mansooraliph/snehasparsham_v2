@@ -6,6 +6,7 @@ import { RoleDashboard } from '@/pages/Dashboards/RoleDashboard';
 import { EventsPage } from '@/pages/Events/EventsPage';
 import { EventFieldsPage } from '@/pages/Events/EventFieldsPage';
 import { EventResponsesPage } from '@/pages/Events/EventResponsesPage';
+import { AllResponsesPage } from '@/pages/Responses/AllResponsesPage';
 import { UsersPage } from '@/pages/Users/UsersPage';
 import { ResponseStatusesPage } from '@/pages/ResponseStatuses/ResponseStatusesPage';
 import { SettingsPage } from '@/pages/Settings/SettingsPage';
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/admin/events" element={<EventsPage />} />
           <Route path="/admin/events/:id/fields" element={<EventFieldsPage />} />
           <Route path="/admin/events/:id/responses" element={<EventResponsesPage />} />
+          <Route path="/admin/responses" element={<AllResponsesPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/admin/response-statuses" element={<ResponseStatusesPage />} />
           <Route path="/admin/settings" element={<SettingsPage />} />

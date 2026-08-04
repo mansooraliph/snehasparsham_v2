@@ -228,7 +228,9 @@ export function EventResponsesPage() {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-card border border-border bg-white">
+      {/* Table on wide screens — below `lg` the field-heavy table can't avoid
+          horizontal scroll, so it's replaced by stacked cards instead. */}
+      <div className="hidden overflow-x-auto rounded-card border border-border bg-white lg:block">
         <table className="w-full text-sm">
           <thead className="bg-table-head text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
             <tr>
@@ -353,6 +355,116 @@ export function EventResponsesPage() {
           <p className="px-4 py-8 text-center text-sm text-text-muted">No responses yet.</p>
         )}
         {listing === null && !error && <p className="px-4 py-8 text-center text-sm text-text-muted">Loading…</p>}
+      </div>
+
+      {/* Card list below `lg` — same data/actions as the table, no horizontal scroll. */}
+      <div className="space-y-3 lg:hidden">
+        {filteredResponses.map((response, index) => (
+          <div key={response.id} className="rounded-card border border-border bg-white p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(response.id)}
+                  onChange={() => toggleSelected(response.id)}
+                  aria-label="Select response"
+                  className="rounded text-blue focus:ring-blue"
+                />
+                <button
+                  type="button"
+                  onClick={() => openDrawer(response, false)}
+                  aria-label="View response"
+                  className="text-text-faint hover:text-blue"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openDrawer(response, true)}
+                  aria-label="Edit response"
+                  className="text-text-faint hover:text-blue"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWhatsAppResponse(response)}
+                  aria-label="Share on WhatsApp"
+                  className="text-text-faint hover:text-green"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(response)}
+                  aria-label="Delete response"
+                  className="text-text-faint hover:text-red"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-xs text-text-muted">#{index + 1}</p>
+                <p className="font-mono text-xs text-text-muted">{response.referenceNumber}</p>
+              </div>
+            </div>
+
+            <p className="mt-2 text-xs text-text-faint">{new Date(response.submittedAt).toLocaleString()}</p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
+              <select
+                value={response.status?.id ?? ''}
+                onChange={(e) => handleStatusChange(response, e.target.value)}
+                className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+              >
+                <option value="">Status —</option>
+                {statuses.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={response.assignee?.id ?? ''}
+                onChange={(e) => handleAssigneeChange(response, e.target.value)}
+                className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+              >
+                <option value="">Unassigned</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <dl className="mt-3 space-y-1.5 border-t border-border pt-3">
+              {listing?.fields.map((field) => (
+                <div key={field.id} className="flex justify-between gap-4 text-sm">
+                  <dt className="text-text-muted">{field.label}</dt>
+                  <dd className="text-right text-text-primary">{formatCell(response.values[field.id]) || '—'}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
+
+        {listing && listing.responses.length > 0 && filteredResponses.length === 0 && (
+          <p className="rounded-card border border-border bg-white px-4 py-8 text-center text-sm text-text-muted">
+            No responses match these filters.
+          </p>
+        )}
+        {listing?.responses.length === 0 && (
+          <p className="rounded-card border border-border bg-white px-4 py-8 text-center text-sm text-text-muted">
+            No responses yet.
+          </p>
+        )}
+        {listing === null && !error && (
+          <p className="rounded-card border border-border bg-white px-4 py-8 text-center text-sm text-text-muted">
+            Loading…
+          </p>
+        )}
       </div>
 
       <ResponseDetailDrawer
