@@ -29,6 +29,9 @@ function toFormValues(event: EventRecord): Partial<EventFormValues> {
     maxParticipants: event.max_participants ? String(event.max_participants) : '',
     status: event.status,
     messageTemplate: event.message_template ?? DEFAULT_MESSAGE_TEMPLATE,
+    referencePrefix: event.reference_prefix ?? '',
+    referenceNextNumber: String(event.reference_next_number),
+    referencePadding: String(event.reference_padding),
   };
 }
 

@@ -7,4 +7,6 @@ export const responseStatusesApi = {
   update: (id: string, input: Partial<ResponseStatusInput>) =>
     http.put<ResponseStatusRecord>(`/response-statuses/${id}`, input).then((r) => r.data),
   remove: (id: string) => http.delete<void>(`/response-statuses/${id}`).then((r) => r.data),
+  reorder: (orderedIds: string[]) =>
+    http.put<ResponseStatusRecord[]>('/response-statuses/reorder', { orderedIds }).then((r) => r.data),
 };

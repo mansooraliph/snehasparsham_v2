@@ -27,6 +27,9 @@ export class EventsService {
       registration_deadline: dto.registrationDeadline ?? null,
       max_participants: dto.maxParticipants ?? null,
       message_template: dto.messageTemplate ?? null,
+      reference_prefix: dto.referencePrefix?.trim() || null,
+      reference_next_number: dto.referenceNextNumber ?? 1,
+      reference_padding: dto.referencePadding ?? 4,
       created_by: createdBy,
     });
     return this.events.save(event);
@@ -75,6 +78,9 @@ export class EventsService {
       ...(dto.registrationDeadline !== undefined && { registration_deadline: dto.registrationDeadline }),
       ...(dto.maxParticipants !== undefined && { max_participants: dto.maxParticipants }),
       ...(dto.messageTemplate !== undefined && { message_template: dto.messageTemplate }),
+      ...(dto.referencePrefix !== undefined && { reference_prefix: dto.referencePrefix.trim() || null }),
+      ...(dto.referenceNextNumber !== undefined && { reference_next_number: dto.referenceNextNumber }),
+      ...(dto.referencePadding !== undefined && { reference_padding: dto.referencePadding }),
     });
     return this.events.save(event);
   }
@@ -103,9 +109,32 @@ export class EventsService {
       registration_deadline: source.registration_deadline,
       max_participants: source.max_participants,
       message_template: source.message_template,
+      reference_prefix: source.reference_prefix,
+      reference_next_number: 1,
+      reference_padding: source.reference_padding,
       created_by: requesterId,
     });
     return this.events.save(copy);
+  }
+
+  /** Atomically claims the next reference number in this event's series and returns it
+   *  formatted (e.g. "REG-2026-0001"). Falls back to caller-supplied random generation
+   *  when the event has no configured prefix. */
+  async claimNextReferenceNumber(eventId: string): Promise<string | null> {
+    const event = await this.findOne(eventId);
+    if (!event.reference_prefix) return null;
+
+    const result = await this.events
+      .createQueryBuilder()
+      .update(Event)
+      .set({ reference_next_number: () => 'reference_next_number + 1' })
+      .where('id = :id', { id: eventId })
+      .returning(['reference_next_number'])
+      .execute();
+
+    const newNext = Number(result.raw[0].reference_next_number);
+    const assigned = newNext - 1;
+    return `${event.reference_prefix}${String(assigned).padStart(event.reference_padding, '0')}`;
   }
 
   /** Admin dashboard — event counts by status plus how many published events are still upcoming. */

@@ -78,7 +78,8 @@ export class EventResponsesService {
     this.assertRequiredFieldsPresent(fields, dto.values);
 
     const responseId = uuidv4();
-    const referenceNumber = await this.generateReferenceNumber();
+    const referenceNumber =
+      (await this.eventsService.claimNextReferenceNumber(eventId)) ?? (await this.generateReferenceNumber());
     await this.dataSource.transaction(async (manager) => {
       await manager.save(EventResponse, {
         id: responseId,

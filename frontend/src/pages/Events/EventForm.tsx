@@ -27,6 +27,9 @@ export interface EventFormValues {
   maxParticipants: string;
   status: EventStatus;
   messageTemplate: string;
+  referencePrefix: string;
+  referenceNextNumber: string;
+  referencePadding: string;
 }
 
 const EMPTY_VALUES: EventFormValues = {
@@ -42,6 +45,9 @@ const EMPTY_VALUES: EventFormValues = {
   maxParticipants: '',
   status: 'draft',
   messageTemplate: DEFAULT_MESSAGE_TEMPLATE,
+  referencePrefix: '',
+  referenceNextNumber: '1',
+  referencePadding: '4',
 };
 
 interface EventFormProps {
@@ -96,6 +102,9 @@ export function EventForm({ initialValues, submitLabel, onSubmit, onCancel }: Ev
         maxParticipants: values.maxParticipants ? Number(values.maxParticipants) : undefined,
         status: values.status,
         messageTemplate: values.messageTemplate.trim() || undefined,
+        referencePrefix: values.referencePrefix.trim(),
+        referenceNextNumber: values.referenceNextNumber ? Number(values.referenceNextNumber) : undefined,
+        referencePadding: values.referencePadding ? Number(values.referencePadding) : undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -222,6 +231,45 @@ export function EventForm({ initialValues, submitLabel, onSubmit, onCancel }: Ev
             rows={3}
             className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-faint focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
           />
+        </Field>
+
+        <Field
+          label="Reference Number Series"
+          htmlFor="referencePrefix"
+          hint="Optional — leave the prefix blank to use a random 10-digit reference number instead"
+        >
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              id="referencePrefix"
+              value={values.referencePrefix}
+              onChange={(e) => set('referencePrefix', e.target.value)}
+              placeholder="Prefix, e.g. REG-2026-"
+              className="col-span-3 sm:col-span-1"
+            />
+            <Input
+              id="referenceNextNumber"
+              type="number"
+              min={1}
+              value={values.referenceNextNumber}
+              onChange={(e) => set('referenceNextNumber', e.target.value)}
+              placeholder="Next number"
+            />
+            <Input
+              id="referencePadding"
+              type="number"
+              min={1}
+              max={10}
+              value={values.referencePadding}
+              onChange={(e) => set('referencePadding', e.target.value)}
+              placeholder="Digits"
+            />
+          </div>
+          {values.referencePrefix.trim() && (
+            <p className="mt-1.5 text-xs text-text-faint">
+              Next reference: {values.referencePrefix.trim()}
+              {String(Number(values.referenceNextNumber) || 1).padStart(Number(values.referencePadding) || 4, '0')}
+            </p>
+          )}
         </Field>
 
         {error && <p className="text-sm text-red">{error}</p>}

@@ -56,28 +56,19 @@ export function EventsPage() {
           <thead className="bg-table-head text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
             <tr>
               <th className="px-4 py-3">S.No</th>
+              <th className="px-4 py-3" />
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Location</th>
               <th className="px-4 py-3">Dates</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {events?.map((event, index) => (
               <tr key={event.id} className="border-t border-border">
                 <td className="px-4 py-3 text-text-muted">{index + 1}</td>
-                <td className="px-4 py-3 font-medium text-text-primary">{event.name}</td>
-                <td className="px-4 py-3 text-text-muted">{event.location}</td>
-                <td className="px-4 py-3 text-text-muted">
-                  {event.start_date}
-                  {event.end_date !== event.start_date ? ` – ${event.end_date}` : ''}
-                </td>
                 <td className="px-4 py-3">
-                  <Badge tone={STATUS_TONE[event.status]}>{event.status}</Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex justify-end gap-3">
+                  <div className="flex justify-start gap-3">
                     <button
                       type="button"
                       onClick={() => navigate(`/admin/events/${event.id}/fields`)}
@@ -103,6 +94,15 @@ export function EventsPage() {
                       <Pencil className="h-4 w-4" />
                     </button>
                   </div>
+                </td>
+                <td className="px-4 py-3 font-medium text-text-primary">{event.name}</td>
+                <td className="px-4 py-3 text-text-muted">{event.location}</td>
+                <td className="px-4 py-3 text-text-muted">
+                  {event.start_date}
+                  {event.end_date !== event.start_date ? ` – ${event.end_date}` : ''}
+                </td>
+                <td className="px-4 py-3">
+                  <Badge tone={STATUS_TONE[event.status]}>{event.status}</Badge>
                 </td>
               </tr>
             ))}

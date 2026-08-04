@@ -52,6 +52,12 @@ export class ResponseStatusesService implements OnModuleInit {
     return this.statuses.save(status);
   }
 
+  /** Persists a full reordering — `orderedIds` is the new top-to-bottom order. */
+  async reorder(orderedIds: string[]): Promise<ResponseStatus[]> {
+    await Promise.all(orderedIds.map((id, index) => this.statuses.update({ id }, { order: index })));
+    return this.findAll();
+  }
+
   async remove(id: string): Promise<void> {
     await this.findOneOrThrow(id);
     // Unassign rather than block the delete — a response losing its status

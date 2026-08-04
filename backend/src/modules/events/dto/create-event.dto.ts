@@ -62,4 +62,19 @@ export class CreateEventDto {
   @IsOptional()
   @IsString()
   messageTemplate?: string;
+
+  /** Leave unset/empty for a random 10-digit code; set to switch this event to a sequential series. */
+  @IsOptional()
+  @IsString()
+  referencePrefix?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  referenceNextNumber?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  referencePadding?: number;
 }

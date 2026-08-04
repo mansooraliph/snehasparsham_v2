@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Eye, MessageCircle, Pencil } from 'lucide-react';
+import { ArrowLeft, Download, Eye, MessageCircle, Pencil, Search } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { eventsApi } from '@/api/events.api';
@@ -39,6 +39,9 @@ export function EventResponsesPage() {
   const [selectedResponse, setSelectedResponse] = useState<AdminResponseRow | null>(null);
   const [drawerInitialEditing, setDrawerInitialEditing] = useState(false);
   const [whatsAppResponse, setWhatsAppResponse] = useState<AdminResponseRow | null>(null);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -87,6 +90,20 @@ export function EventResponsesPage() {
     setDrawerInitialEditing(editing);
   }
 
+  const filteredResponses = useMemo(() => {
+    if (!listing) return [];
+    const q = search.trim().toLowerCase();
+    return listing.responses.filter((response) => {
+      if (statusFilter && response.status?.id !== statusFilter) return false;
+      if (assigneeFilter && response.assignee?.id !== assigneeFilter) return false;
+      if (!q) return true;
+      const haystack = [response.referenceNumber, ...Object.values(response.values).map(formatCell)]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [listing, statusFilter, assigneeFilter, search]);
+
   if (error) return <p className="text-sm text-red">{error}</p>;
 
   return (
@@ -104,7 +121,9 @@ export function EventResponsesPage() {
         <div>
           <h2 className="text-base font-semibold text-text-primary">{event?.name ?? 'Loading…'}</h2>
           <p className="text-sm text-text-muted">
-            {listing ? `${listing.responses.length} response${listing.responses.length === 1 ? '' : 's'}` : 'Loading…'}
+            {listing
+              ? `${filteredResponses.length} of ${listing.responses.length} response${listing.responses.length === 1 ? '' : 's'}`
+              : 'Loading…'}
             {event?.max_participants ? ` · limit ${event.max_participants}` : ''}
           </p>
         </div>
@@ -114,31 +133,105 @@ export function EventResponsesPage() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search reference # or form values…"
+            className="w-full rounded-card border border-border bg-white py-2 pl-9 pr-3 text-sm text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+        >
+          <option value="">All statuses</option>
+          {statuses.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          className="rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+        >
+          <option value="">All assignees</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+        {(statusFilter || assigneeFilter || search) && (
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter('');
+              setAssigneeFilter('');
+              setSearch('');
+            }}
+            className="text-sm font-medium text-blue hover:underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       <div className="overflow-x-auto rounded-card border border-border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-table-head text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
             <tr>
+              <th className="px-4 py-3">S.No</th>
+              <th className="px-4 py-3" />
+              <th className="whitespace-nowrap px-4 py-3">Status</th>
+              <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
               <th className="whitespace-nowrap px-4 py-3">Reference #</th>
               {listing?.fields.map((field) => (
                 <th key={field.id} className="whitespace-nowrap px-4 py-3">
                   {field.label}
                 </th>
               ))}
-              <th className="whitespace-nowrap px-4 py-3">Status</th>
-              <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
               <th className="whitespace-nowrap px-4 py-3">Submitted At</th>
-              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
-            {listing?.responses.map((response) => (
+            {filteredResponses.map((response, index) => (
               <tr key={response.id} className="border-t border-border hover:bg-table-head">
-                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted">{response.referenceNumber}</td>
-                {listing.fields.map((field) => (
-                  <td key={field.id} className="px-4 py-3 text-text-primary">
-                    {formatCell(response.values[field.id])}
-                  </td>
-                ))}
+                <td className="px-4 py-3 text-text-muted">{index + 1}</td>
+                <td className="px-4 py-3">
+                  <div className="flex justify-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => openDrawer(response, false)}
+                      aria-label="View response"
+                      className="text-text-faint hover:text-blue"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openDrawer(response, true)}
+                      aria-label="Edit response"
+                      className="text-text-faint hover:text-blue"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWhatsAppResponse(response)}
+                      aria-label="Share on WhatsApp"
+                      className="text-text-faint hover:text-green"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
@@ -170,40 +263,21 @@ export function EventResponsesPage() {
                     ))}
                   </select>
                 </td>
+                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted">{response.referenceNumber}</td>
+                {listing?.fields.map((field) => (
+                  <td key={field.id} className="px-4 py-3 text-text-primary">
+                    {formatCell(response.values[field.id])}
+                  </td>
+                ))}
                 <td className="px-4 py-3 text-text-muted">{new Date(response.submittedAt).toLocaleString()}</td>
-                <td className="px-4 py-3">
-                  <div className="flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openDrawer(response, false)}
-                      aria-label="View response"
-                      className="text-text-faint hover:text-blue"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openDrawer(response, true)}
-                      aria-label="Edit response"
-                      className="text-text-faint hover:text-blue"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWhatsAppResponse(response)}
-                      aria-label="Share on WhatsApp"
-                      className="text-text-faint hover:text-green"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
 
+        {listing && listing.responses.length > 0 && filteredResponses.length === 0 && (
+          <p className="px-4 py-8 text-center text-sm text-text-muted">No responses match these filters.</p>
+        )}
         {listing?.responses.length === 0 && (
           <p className="px-4 py-8 text-center text-sm text-text-muted">No responses yet.</p>
         )}

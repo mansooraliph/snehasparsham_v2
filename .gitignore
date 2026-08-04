@@ -3,5 +3,6 @@ dist/
 .env
 *.log
 *.tsbuildinfo
+.claude/
 backend/uploads/**
 !backend/uploads/**/.gitkeep

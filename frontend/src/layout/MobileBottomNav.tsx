@@ -2,7 +2,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils/cn';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { navItemsForRole } from './navConfig';
+import { primaryNavItemsForRole } from './navConfig';
 
 interface Props {
   onMoreClick: () => void;
@@ -13,7 +13,7 @@ export function MobileBottomNav({ onMoreClick }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
-  const items = user ? navItemsForRole(user.role) : [];
+  const items = user ? primaryNavItemsForRole(user.role) : [];
 
   return (
     <nav

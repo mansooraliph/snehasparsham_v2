@@ -14,6 +14,9 @@ export interface EventRecord {
   registration_deadline: string | null;
   max_participants: number | null;
   message_template: string | null;
+  reference_prefix: string | null;
+  reference_next_number: number;
+  reference_padding: number;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -34,4 +37,8 @@ export interface CreateEventInput {
   registrationDeadline?: string;
   maxParticipants?: number;
   messageTemplate?: string;
+  /** Empty string clears a configured series back to random-number generation. */
+  referencePrefix?: string;
+  referenceNextNumber?: number;
+  referencePadding?: number;
 }

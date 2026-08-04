@@ -5,6 +5,8 @@ export interface NavItem {
   label: string;
   path: string;
   icon: typeof LayoutDashboard;
+  /** false = shown in the sidebar/"More" sheet but not as a mobile bottom tab (default true). */
+  tab?: boolean;
 }
 
 const EVENT_ADMIN_ROLES: Role[] = ['super_admin', 'district_state_admin', 'government_official'];
@@ -17,12 +19,17 @@ export function navItemsForRole(role: Role): NavItem[] {
 
   if (EVENT_ADMIN_ROLES.includes(role)) {
     items.push({ label: 'Events', path: '/admin/events', icon: CalendarDays });
-    items.push({ label: 'Response Statuses', path: '/admin/response-statuses', icon: Tags });
+    items.push({ label: 'Response Statuses', path: '/admin/response-statuses', icon: Tags, tab: false });
   }
   if (USER_ADMIN_ROLES.includes(role)) {
     items.push({ label: 'Users', path: '/admin/users', icon: Users });
   }
   return items;
+}
+
+/** Subset of navItemsForRole shown as mobile bottom tabs — everything else lives behind "More". */
+export function primaryNavItemsForRole(role: Role): NavItem[] {
+  return navItemsForRole(role).filter((item) => item.tab !== false);
 }
 
 const DASHBOARD_PATH: Record<Role, string> = {

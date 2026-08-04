@@ -59,6 +59,18 @@ export class Event {
   @Column({ type: 'text', nullable: true })
   message_template: string | null;
 
+  /** Reference number series (null prefix = fall back to a random 10-digit code). */
+  @Column({ type: 'varchar', nullable: true })
+  reference_prefix: string | null;
+
+  /** Next sequential number to assign — atomically incremented on each submission. */
+  @Column({ type: 'int', default: 1 })
+  reference_next_number: number;
+
+  /** How many digits the sequential number is zero-padded to. */
+  @Column({ type: 'int', default: 4 })
+  reference_padding: number;
+
   @Index()
   @Column()
   created_by: string;

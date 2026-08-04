@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { IsArray, IsString } from 'class-validator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { Role } from '../../common/enums/role.enum';
@@ -8,6 +9,12 @@ import { CreateResponseStatusDto } from './dto/create-response-status.dto';
 import { UpdateResponseStatusDto } from './dto/update-response-status.dto';
 
 const EVENT_ADMIN_ROLES = [Role.SUPER_ADMIN, Role.DISTRICT_STATE_ADMIN];
+
+class ReorderResponseStatusesDto {
+  @IsArray()
+  @IsString({ each: true })
+  orderedIds: string[];
+}
 
 @Roles(...EVENT_ADMIN_ROLES)
 @RequirePermissions(Permission.MANAGE_RESPONSES)
@@ -23,6 +30,13 @@ export class ResponseStatusesController {
   @Post()
   create(@Body() dto: CreateResponseStatusDto) {
     return this.statuses.create(dto);
+  }
+
+  // Declared before ':id' so the literal 'reorder' segment isn't swallowed by
+  // the param route (Nest matches in declaration order).
+  @Put('reorder')
+  reorder(@Body() dto: ReorderResponseStatusesDto) {
+    return this.statuses.reorder(dto.orderedIds);
   }
 
   @Put(':id')
