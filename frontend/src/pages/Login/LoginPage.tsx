@@ -140,14 +140,16 @@ export function LoginPage() {
 
         {method === 'otp' && !otpSentTo && (
           <form onSubmit={handleSendOtp} className="space-y-4">
-            <Field label="Phone Number" htmlFor="phone" hint="Include country code, e.g. +919876543210">
+            <Field label="Phone Number" htmlFor="phone" hint="10-digit phone number">
               <Input
                 id="phone"
                 type="tel"
+                inputMode="numeric"
                 autoComplete="tel"
+                maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+919876543210"
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                placeholder="9876543210"
                 required
               />
             </Field>

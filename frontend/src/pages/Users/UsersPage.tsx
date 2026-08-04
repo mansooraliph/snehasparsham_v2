@@ -103,12 +103,15 @@ export function UsersPage() {
         {users === null && !error && <p className="px-4 py-8 text-center text-sm text-text-muted">Loading…</p>}
       </div>
 
-      <UserFormDrawer
-        open={drawerUser !== null}
-        user={drawerUser === 'new' || drawerUser === null ? undefined : drawerUser}
-        onClose={() => setDrawerUser(null)}
-        onSaved={handleSaved}
-      />
+      {drawerUser !== null && (
+        <UserFormDrawer
+          key={drawerUser === 'new' ? 'new' : drawerUser.id}
+          open
+          user={drawerUser === 'new' ? undefined : drawerUser}
+          onClose={() => setDrawerUser(null)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 }

@@ -97,14 +97,21 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
 
-          <Field label="Phone" htmlFor="phone" hint="International format, e.g. +919876543210">
-            <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Field label="Phone" htmlFor="phone" hint="10-digit phone number">
+            <Input
+              id="phone"
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+            />
           </Field>
 
           <Field
             label={isEdit ? 'New Password' : 'Password'}
             htmlFor="password"
-            hint={isEdit ? 'Leave blank to keep the current password' : 'Min 8 chars, 1 number, 1 special character'}
+            hint={isEdit ? 'Leave blank to keep the current password' : 'Min 8 characters'}
           >
             <Input
               id="password"

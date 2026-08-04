@@ -34,13 +34,19 @@ http.interceptors.response.use(
 );
 
 interface ApiErrorEnvelope {
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; details?: Record<string, string[]> };
 }
 
-/** Extracts a human-readable message from an axios/API error. */
+/** Extracts a human-readable message from an axios/API error. Field-level validation
+ *  errors (`error.details`) take priority over the generic "Validation failed" summary
+ *  message, so e.g. a rejected password actually says why instead of just failing silently. */
 export function getApiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
   if (error instanceof AxiosError) {
     const data = error.response?.data as ApiErrorEnvelope | undefined;
+    const details = data?.error?.details;
+    if (details && Object.keys(details).length > 0) {
+      return Object.values(details).flat().join(' ');
+    }
     return data?.error?.message ?? error.message ?? fallback;
   }
   if (error instanceof Error) return error.message;

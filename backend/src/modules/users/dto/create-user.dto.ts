@@ -2,9 +2,7 @@ import { IsArray, IsEmail, IsEnum, IsOptional, IsString, Matches, MinLength } fr
 import { Role, UserStatus } from '../../../common/enums/role.enum';
 import { Permission } from '../../../common/enums/permission.enum';
 
-const PHONE_REGEX = /^\+[1-9]\d{7,14}$/;
-/** At least 1 number + 1 special character (login-module.md §6). */
-const PASSWORD_REGEX = /^(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-+=[\]\\/;'`~]).+$/;
+const PHONE_REGEX = /^\d{10}$/;
 
 export class CreateUserDto {
   @IsString()
@@ -16,13 +14,10 @@ export class CreateUserDto {
   email?: string;
 
   @IsOptional()
-  @Matches(PHONE_REGEX, { message: 'Phone must be in international format, e.g. +919876543210' })
+  @Matches(PHONE_REGEX, { message: 'Phone must be a 10-digit number' })
   phone?: string;
 
   @MinLength(8)
-  @Matches(PASSWORD_REGEX, {
-    message: 'Password must contain at least 1 number and 1 special character',
-  })
   password: string;
 
   @IsEnum(Role)
