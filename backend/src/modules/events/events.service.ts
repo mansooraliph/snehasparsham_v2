@@ -26,6 +26,7 @@ export class EventsService {
       status: dto.status ?? EventStatus.DRAFT,
       registration_deadline: dto.registrationDeadline ?? null,
       max_participants: dto.maxParticipants ?? null,
+      message_template: dto.messageTemplate ?? null,
       created_by: createdBy,
     });
     return this.events.save(event);
@@ -73,6 +74,7 @@ export class EventsService {
       ...(dto.status !== undefined && { status: dto.status }),
       ...(dto.registrationDeadline !== undefined && { registration_deadline: dto.registrationDeadline }),
       ...(dto.maxParticipants !== undefined && { max_participants: dto.maxParticipants }),
+      ...(dto.messageTemplate !== undefined && { message_template: dto.messageTemplate }),
     });
     return this.events.save(event);
   }
@@ -100,6 +102,7 @@ export class EventsService {
       status: EventStatus.DRAFT,
       registration_deadline: source.registration_deadline,
       max_participants: source.max_participants,
+      message_template: source.message_template,
       created_by: requesterId,
     });
     return this.events.save(copy);

@@ -14,6 +14,11 @@ export class EventResponse {
   @Column({ type: 'varchar', nullable: true })
   submitted_by: string | null;
 
+  /** Shown to the submitter after registering, so they have something to quote when following up. */
+  @Index({ unique: true })
+  @Column({ type: 'varchar' })
+  reference_number: string;
+
   @CreateDateColumn({ type: 'timestamptz' })
   submitted_at: Date;
 }

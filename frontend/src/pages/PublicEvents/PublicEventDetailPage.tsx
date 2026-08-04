@@ -19,7 +19,7 @@ export function PublicEventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -59,8 +59,8 @@ export function PublicEventDetailPage() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await eventResponsesApi.submit(id, values);
-      setSubmitted(true);
+      const result = await eventResponsesApi.submit(id, values);
+      setReferenceNumber(result.referenceNumber);
     } catch (err) {
       setSubmitError(getApiErrorMessage(err, 'Could not submit the form'));
       setIsSubmitting(false);
@@ -101,10 +101,15 @@ export function PublicEventDetailPage() {
 
       {fields && fields.length > 0 && (
         <div className="rounded-card border border-border bg-white p-6">
-          {submitted ? (
-            <div className="flex items-center gap-2 py-6 text-green">
-              <CheckCircle2 className="h-5 w-5" />
-              <p className="text-sm font-medium">Thanks — your submission has been received.</p>
+          {referenceNumber ? (
+            <div className="flex flex-col items-center gap-2 py-6 text-center">
+              <CheckCircle2 className="h-5 w-5 text-green" />
+              <p className="text-sm font-medium text-green">Thanks — your submission has been received.</p>
+              <p className="text-sm text-text-muted">Your reference number:</p>
+              <p className="rounded-card bg-table-head px-4 py-2 font-mono text-base font-semibold text-text-primary">
+                {referenceNumber}
+              </p>
+              <p className="text-xs text-text-muted">Save this number — quote it if you need to follow up.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">

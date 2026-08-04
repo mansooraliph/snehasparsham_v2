@@ -4,6 +4,7 @@ import type { EventFormFieldRecord } from '@/types/eventField';
 
 export interface AdminResponseRow {
   id: string;
+  referenceNumber: string;
   submittedAt: string;
   values: Record<string, EventFieldValue>;
 }
@@ -16,7 +17,7 @@ export interface EventResponsesListing {
 export const eventResponsesApi = {
   /** Public submission — no auth (events-registration-module.md §3.4). */
   submit: (eventId: string, values: Record<string, EventFieldValue>) =>
-    http.post<{ id: string }>(`/events/${eventId}/responses`, { values }).then((r) => r.data),
+    http.post<{ id: string; referenceNumber: string }>(`/events/${eventId}/responses`, { values }).then((r) => r.data),
 
   listForEvent: (eventId: string) =>
     http.get<EventResponsesListing>(`/events/${eventId}/responses`).then((r) => r.data),

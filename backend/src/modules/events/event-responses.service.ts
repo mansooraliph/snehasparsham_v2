@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import { randomInt } from 'crypto';
 import { EventResponse } from '../../database/entities/event-response.entity';
 import { EventResponseValue } from '../../database/entities/event-response-value.entity';
 import { EventFormField } from '../../database/entities/event-form-field.entity';
@@ -12,8 +13,14 @@ import { EventFieldValue, SubmitEventResponseDto } from './dto/submit-event-resp
 
 export interface AdminResponseRow {
   id: string;
+  referenceNumber: string;
   submittedAt: Date;
   values: Record<string, EventFieldValue>;
+}
+
+/** 10-digit numeric code, e.g. "4839201576" — ~9 billion combinations. */
+function randomReferenceCode(): string {
+  return randomInt(1_000_000_000, 10_000_000_000).toString();
 }
 
 @Injectable()
@@ -36,7 +43,7 @@ export class EventResponsesService {
   }
 
   /** Public submission (events-registration-module.md §3.4) — no login, no duplicate check. */
-  async submit(eventId: string, dto: SubmitEventResponseDto): Promise<{ id: string }> {
+  async submit(eventId: string, dto: SubmitEventResponseDto): Promise<{ id: string; referenceNumber: string }> {
     // 404s on anything not Published — same guard the public detail page uses.
     const event = await this.eventsService.findPublishedOne(eventId);
 
@@ -58,11 +65,13 @@ export class EventResponsesService {
     this.assertRequiredFieldsPresent(fields, dto.values);
 
     const responseId = uuidv4();
+    const referenceNumber = await this.generateReferenceNumber();
     await this.dataSource.transaction(async (manager) => {
       await manager.save(EventResponse, {
         id: responseId,
         event_id: eventId,
         submitted_by: null,
+        reference_number: referenceNumber,
       });
 
       const rows = fields
@@ -78,8 +87,8 @@ export class EventResponsesService {
       if (rows.length) await manager.save(EventResponseValue, rows);
     });
 
-    this.logConfirmation(event.name, fields, dto.values);
-    return { id: responseId };
+    this.logConfirmation(event.name, fields, dto.values, referenceNumber);
+    return { id: responseId, referenceNumber };
   }
 
   /** Admin edit — overwrites values for an existing response (events-registration-module.md scope: admin data correction). */
@@ -108,7 +117,12 @@ export class EventResponsesService {
       if (rows.length) await manager.save(EventResponseValue, rows);
     });
 
-    return { id: responseId, submittedAt: response.submitted_at, values: dto.values };
+    return {
+      id: responseId,
+      referenceNumber: response.reference_number,
+      submittedAt: response.submitted_at,
+      values: dto.values,
+    };
   }
 
   /** Admin listing — every response for the event, values keyed by field id. */
@@ -131,6 +145,7 @@ export class EventResponsesService {
       fields,
       responses: responses.map((r) => ({
         id: r.id,
+        referenceNumber: r.reference_number,
         submittedAt: r.submitted_at,
         values: Object.fromEntries(
           (byResponse.get(r.id) ?? []).map((v) => [v.field_id, safeParse(v.value)]),
@@ -141,12 +156,23 @@ export class EventResponsesService {
 
   async exportCsv(eventId: string): Promise<string> {
     const { fields, responses } = await this.findAllForEvent(eventId);
-    const header = [...fields.map((f) => f.label), 'Submitted At'];
+    const header = ['Reference Number', ...fields.map((f) => f.label), 'Submitted At'];
     const rows = responses.map((r) => [
+      r.referenceNumber,
       ...fields.map((f) => formatCell(r.values[f.id])),
       r.submittedAt.toISOString(),
     ]);
     return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+  }
+
+  /** Retries on the rare collision — 8 chars from a 33-char set is ~1.7e12 combinations. */
+  private async generateReferenceNumber(): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = randomReferenceCode();
+      const exists = await this.responses.exists({ where: { reference_number: candidate } });
+      if (!exists) return candidate;
+    }
+    throw new Error('Could not generate a unique reference number.');
   }
 
   private assertRequiredFieldsPresent(fields: EventFormField[], values: Record<string, EventFieldValue>): void {
@@ -175,11 +201,12 @@ export class EventResponsesService {
     eventName: string,
     fields: EventFormField[],
     values: Record<string, EventFieldValue>,
+    referenceNumber: string,
   ): void {
     const contactField = fields.find((f) => f.field_type === 'email' || /email|phone|mobile/i.test(f.label));
     const contact = contactField ? values[contactField.id] : undefined;
     this.logger.log(
-      `Registration confirmation for "${eventName}"${contact ? ` → ${contact}` : ''}: submission received.`,
+      `Registration confirmation for "${eventName}"${contact ? ` → ${contact}` : ''}: submission received (ref ${referenceNumber}).`,
     );
   }
 }

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Input';
 import { eventsApi } from '@/api/events.api';
 import { getApiErrorMessage } from '@/api/http';
+import { DEFAULT_MESSAGE_TEMPLATE } from '@/lib/utils/messageTemplate';
 import type { CreateEventInput, EventStatus } from '@/types/event';
 
 const STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
@@ -25,6 +26,7 @@ export interface EventFormValues {
   registrationDeadline: string;
   maxParticipants: string;
   status: EventStatus;
+  messageTemplate: string;
 }
 
 const EMPTY_VALUES: EventFormValues = {
@@ -39,6 +41,7 @@ const EMPTY_VALUES: EventFormValues = {
   registrationDeadline: '',
   maxParticipants: '',
   status: 'draft',
+  messageTemplate: DEFAULT_MESSAGE_TEMPLATE,
 };
 
 interface EventFormProps {
@@ -92,6 +95,7 @@ export function EventForm({ initialValues, submitLabel, onSubmit, onCancel }: Ev
         registrationDeadline: values.registrationDeadline || undefined,
         maxParticipants: values.maxParticipants ? Number(values.maxParticipants) : undefined,
         status: values.status,
+        messageTemplate: values.messageTemplate.trim() || undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -204,6 +208,20 @@ export function EventForm({ initialValues, submitLabel, onSubmit, onCancel }: Ev
               </option>
             ))}
           </select>
+        </Field>
+
+        <Field
+          label="WhatsApp Message Template"
+          htmlFor="messageTemplate"
+          hint={'Placeholders: {{name}}, {{eventName}}, {{location}}, {{startDate}}, {{referenceNumber}}, or any form field label, e.g. {{Full Name}}'}
+        >
+          <textarea
+            id="messageTemplate"
+            value={values.messageTemplate}
+            onChange={(e) => set('messageTemplate', e.target.value)}
+            rows={3}
+            className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-faint focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+          />
         </Field>
 
         {error && <p className="text-sm text-red">{error}</p>}

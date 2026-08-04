@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { eventsApi } from '@/api/events.api';
 import { eventResponsesApi } from '@/api/eventResponses.api';
 import type { AdminResponseRow, EventResponsesListing } from '@/api/eventResponses.api';
 import { getApiErrorMessage } from '@/api/http';
 import { ResponseDetailDrawer } from './ResponseDetailDrawer';
+import { WhatsAppMessageModal } from './WhatsAppMessageModal';
 import type { EventFieldValue } from '@/types/eventField';
 import type { EventRecord } from '@/types/event';
 
@@ -29,6 +30,7 @@ export function EventResponsesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<AdminResponseRow | null>(null);
+  const [whatsAppResponse, setWhatsAppResponse] = useState<AdminResponseRow | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -83,12 +85,14 @@ export function EventResponsesPage() {
         <table className="w-full text-sm">
           <thead className="bg-table-head text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
             <tr>
+              <th className="whitespace-nowrap px-4 py-3">Reference #</th>
               {listing?.fields.map((field) => (
                 <th key={field.id} className="whitespace-nowrap px-4 py-3">
                   {field.label}
                 </th>
               ))}
               <th className="whitespace-nowrap px-4 py-3">Submitted At</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
@@ -98,12 +102,26 @@ export function EventResponsesPage() {
                 onClick={() => setSelectedResponse(response)}
                 className="cursor-pointer border-t border-border hover:bg-table-head"
               >
+                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted">{response.referenceNumber}</td>
                 {listing.fields.map((field) => (
                   <td key={field.id} className="px-4 py-3 text-text-primary">
                     {formatCell(response.values[field.id])}
                   </td>
                 ))}
                 <td className="px-4 py-3 text-text-muted">{new Date(response.submittedAt).toLocaleString()}</td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setWhatsAppResponse(response);
+                    }}
+                    aria-label="Share on WhatsApp"
+                    className="text-text-faint hover:text-green"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -130,6 +148,15 @@ export function EventResponsesPage() {
           );
         }}
       />
+
+      {event && whatsAppResponse && (
+        <WhatsAppMessageModal
+          event={event}
+          fields={listing?.fields ?? []}
+          response={whatsAppResponse}
+          onClose={() => setWhatsAppResponse(null)}
+        />
+      )}
     </div>
   );
 }

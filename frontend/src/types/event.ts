@@ -13,6 +13,7 @@ export interface EventRecord {
   status: EventStatus;
   registration_deadline: string | null;
   max_participants: number | null;
+  message_template: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -32,4 +33,5 @@ export interface CreateEventInput {
   status?: EventStatus;
   registrationDeadline?: string;
   maxParticipants?: number;
+  messageTemplate?: string;
 }

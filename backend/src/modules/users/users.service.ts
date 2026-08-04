@@ -103,7 +103,11 @@ export class UsersService {
       status: dto.status ?? UserStatus.ACTIVE,
       permissions: dto.permissions ?? [],
     });
-    return this.users.save(user);
+    const saved = await this.users.save(user);
+    // `save()` returns the exact entity passed in — including password_hash, which
+    // `select: false` does NOT strip from it (that option only affects find/findOne
+    // queries). Re-fetch so the response never carries the hash back to the client.
+    return this.findById(saved.id) as Promise<User>;
   }
 
   async updateByAdmin(id: string, dto: UpdateUserDto): Promise<User> {

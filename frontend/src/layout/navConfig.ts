@@ -1,4 +1,4 @@
-import { LayoutDashboard, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Users } from 'lucide-react';
 import type { Role } from '@/types/auth';
 
 export interface NavItem {
@@ -7,16 +7,21 @@ export interface NavItem {
   icon: typeof LayoutDashboard;
 }
 
-const ADMIN_ROLES: Role[] = ['super_admin', 'district_state_admin', 'government_official'];
+const EVENT_ADMIN_ROLES: Role[] = ['super_admin', 'district_state_admin', 'government_official'];
+/** Matches USER_ADMIN_ROLES in the backend's users.controller.ts. */
+const USER_ADMIN_ROLES: Role[] = ['super_admin', 'district_state_admin'];
 
 /** Per-role sidebar nav — grows as each module ships (see CLAUDE.md build order). */
 export function navItemsForRole(role: Role): NavItem[] {
-  const dashboard: NavItem = { label: 'Dashboard', path: DASHBOARD_PATH[role], icon: LayoutDashboard };
+  const items: NavItem[] = [{ label: 'Dashboard', path: DASHBOARD_PATH[role], icon: LayoutDashboard }];
 
-  if (ADMIN_ROLES.includes(role)) {
-    return [dashboard, { label: 'Events', path: '/admin/events', icon: CalendarDays }];
+  if (EVENT_ADMIN_ROLES.includes(role)) {
+    items.push({ label: 'Events', path: '/admin/events', icon: CalendarDays });
   }
-  return [dashboard];
+  if (USER_ADMIN_ROLES.includes(role)) {
+    items.push({ label: 'Users', path: '/admin/users', icon: Users });
+  }
+  return items;
 }
 
 const DASHBOARD_PATH: Record<Role, string> = {

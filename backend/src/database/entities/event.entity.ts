@@ -54,6 +54,11 @@ export class Event {
   @Column({ type: 'int', nullable: true })
   max_participants: number | null;
 
+  /** Template for the Admin's WhatsApp share message — supports {{tokens}}
+   *  resolved client-side from the response's field values plus event info. */
+  @Column({ type: 'text', nullable: true })
+  message_template: string | null;
+
   @Index()
   @Column()
   created_by: string;

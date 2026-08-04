@@ -65,9 +65,10 @@ export function ResponseDetailDrawer({ open, eventId, fields, response, onClose,
     <Drawer open={open} onClose={resetAndClose} title="Response Details" widthClass="max-w-lg">
       {open && response && (
         <div className="space-y-4">
-          <p className="text-sm text-text-muted">
-            Submitted {new Date(response.submittedAt).toLocaleString()}
-          </p>
+          <div>
+            <p className="font-mono text-sm font-semibold text-text-primary">{response.referenceNumber}</p>
+            <p className="text-sm text-text-muted">Submitted {new Date(response.submittedAt).toLocaleString()}</p>
+          </div>
 
           <div className="space-y-4">
             {fields.map((field) =>

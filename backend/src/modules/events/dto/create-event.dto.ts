@@ -58,4 +58,8 @@ export class CreateEventDto {
   @IsInt()
   @Min(1)
   maxParticipants?: number;
+
+  @IsOptional()
+  @IsString()
+  messageTemplate?: string;
 }

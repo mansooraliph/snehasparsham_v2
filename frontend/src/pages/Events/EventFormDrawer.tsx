@@ -2,6 +2,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { eventsApi } from '@/api/events.api';
 import { getApiErrorMessage } from '@/api/http';
 import { toHm } from '@/lib/utils/formatTime';
+import { DEFAULT_MESSAGE_TEMPLATE } from '@/lib/utils/messageTemplate';
 import { EventForm } from './EventForm';
 import type { EventFormValues } from './EventForm';
 import type { CreateEventInput, EventRecord } from '@/types/event';
@@ -27,6 +28,7 @@ function toFormValues(event: EventRecord): Partial<EventFormValues> {
     registrationDeadline: event.registration_deadline ?? '',
     maxParticipants: event.max_participants ? String(event.max_participants) : '',
     status: event.status,
+    messageTemplate: event.message_template ?? DEFAULT_MESSAGE_TEMPLATE,
   };
 }
 
