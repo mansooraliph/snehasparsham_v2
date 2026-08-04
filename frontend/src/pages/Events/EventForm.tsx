@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Input';
+import { cn } from '@/lib/utils/cn';
 import { eventsApi } from '@/api/events.api';
 import { getApiErrorMessage } from '@/api/http';
 import { DEFAULT_MESSAGE_TEMPLATE } from '@/lib/utils/messageTemplate';
@@ -12,6 +13,14 @@ const STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
   { value: 'published', label: 'Published' },
   { value: 'closed', label: 'Closed' },
   { value: 'cancelled', label: 'Cancelled' },
+];
+
+type FormTab = 'details' | 'registration' | 'message';
+
+const TABS: { key: FormTab; label: string }[] = [
+  { key: 'details', label: 'Details' },
+  { key: 'registration', label: 'Registration' },
+  { key: 'message', label: 'WhatsApp Message' },
 ];
 
 export interface EventFormValues {
@@ -58,6 +67,7 @@ interface EventFormProps {
 }
 
 export function EventForm({ initialValues, submitLabel, onSubmit, onCancel }: EventFormProps) {
+  const [tab, setTab] = useState<FormTab>('details');
   const [values, setValues] = useState<EventFormValues>({ ...EMPTY_VALUES, ...initialValues });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingPoster, setIsUploadingPoster] = useState(false);
@@ -113,176 +123,203 @@ export function EventForm({ initialValues, submitLabel, onSubmit, onCancel }: Ev
   }
 
   return (
-    <>
-      <form id="event-form" onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Event Name" htmlFor="name">
-          <Input id="name" value={values.name} onChange={(e) => set('name', e.target.value)} required />
-        </Field>
-
-        <Field label="Description" htmlFor="description" hint="Optional">
-          <textarea
-            id="description"
-            value={values.description}
-            onChange={(e) => set('description', e.target.value)}
-            rows={3}
-            className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-faint focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
-          />
-        </Field>
-
-        <Field label="Poster Image" htmlFor="posterImage" hint="Optional — JPEG, PNG, WEBP or GIF, up to 5MB">
-          <div className="flex items-center gap-3">
-            {values.posterUrl && (
-              <img
-                src={values.posterUrl}
-                alt="Poster preview"
-                className="h-16 w-16 rounded-card border border-border object-cover"
-              />
+    <form id="event-form" onSubmit={handleSubmit} className="space-y-4">
+      <div className="-mt-1 flex gap-5 border-b border-border">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'relative -mb-px py-2.5 text-sm font-medium transition-colors',
+              tab === t.key ? 'text-blue' : 'text-text-muted hover:text-text-primary',
             )}
-            <div className="flex flex-col gap-1">
-              <input
-                id="posterImage"
-                ref={posterInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={handlePosterChange}
-                disabled={isUploadingPoster}
-                className="text-sm text-text-primary file:mr-3 file:rounded-card file:border-0 file:bg-table-alt file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-text-primary hover:file:bg-border"
-              />
-              {isUploadingPoster && <p className="text-xs text-text-faint">Uploading…</p>}
-              {values.posterUrl && !isUploadingPoster && (
-                <button
-                  type="button"
-                  onClick={() => set('posterUrl', '')}
-                  className="self-start text-xs text-red hover:underline"
-                >
-                  Remove image
-                </button>
-              )}
-            </div>
-          </div>
-        </Field>
-
-        <Field label="Location" htmlFor="location">
-          <Input id="location" value={values.location} onChange={(e) => set('location', e.target.value)} required />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Start Date" htmlFor="startDate">
-            <Input id="startDate" type="date" value={values.startDate} onChange={(e) => set('startDate', e.target.value)} required />
-          </Field>
-          <Field label="End Date" htmlFor="endDate" hint="Leave blank for a single-day event">
-            <Input id="endDate" type="date" value={values.endDate} onChange={(e) => set('endDate', e.target.value)} min={values.startDate} />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Start Time" htmlFor="startTime" hint="Optional">
-            <Input id="startTime" type="time" value={values.startTime} onChange={(e) => set('startTime', e.target.value)} />
-          </Field>
-          <Field label="End Time" htmlFor="endTime" hint="Optional">
-            <Input id="endTime" type="time" value={values.endTime} onChange={(e) => set('endTime', e.target.value)} />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Registration Deadline" htmlFor="registrationDeadline" hint="Optional">
-            <Input
-              id="registrationDeadline"
-              type="date"
-              value={values.registrationDeadline}
-              onChange={(e) => set('registrationDeadline', e.target.value)}
-            />
-          </Field>
-          <Field label="Max Participants" htmlFor="maxParticipants" hint="Optional — leave blank for unlimited">
-            <Input
-              id="maxParticipants"
-              type="number"
-              min={1}
-              value={values.maxParticipants}
-              onChange={(e) => set('maxParticipants', e.target.value)}
-            />
-          </Field>
-        </div>
-
-        <Field label="Status" htmlFor="status">
-          <select
-            id="status"
-            value={values.status}
-            onChange={(e) => set('status', e.target.value as EventStatus)}
-            className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
           >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+            {t.label}
+            {tab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-blue" />}
+          </button>
+        ))}
+      </div>
 
-        <Field
-          label="WhatsApp Message Template"
-          htmlFor="messageTemplate"
-          hint={'Placeholders: {{name}}, {{eventName}}, {{location}}, {{startDate}}, {{referenceNumber}}, or any form field label, e.g. {{Full Name}}'}
-        >
-          <textarea
-            id="messageTemplate"
-            value={values.messageTemplate}
-            onChange={(e) => set('messageTemplate', e.target.value)}
-            rows={3}
-            className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-faint focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
-          />
-        </Field>
+      {tab === 'details' && (
+        <div className="space-y-4">
+          <Field label="Event Name" htmlFor="name">
+            <Input id="name" value={values.name} onChange={(e) => set('name', e.target.value)} required />
+          </Field>
 
-        <Field
-          label="Reference Number Series"
-          htmlFor="referencePrefix"
-          hint="Optional — leave the prefix blank to use a random 10-digit reference number instead"
-        >
-          <div className="grid grid-cols-3 gap-2">
-            <Input
-              id="referencePrefix"
-              value={values.referencePrefix}
-              onChange={(e) => set('referencePrefix', e.target.value)}
-              placeholder="Prefix, e.g. REG-2026-"
-              className="col-span-3 sm:col-span-1"
+          <Field label="Description" htmlFor="description" hint="Optional">
+            <textarea
+              id="description"
+              value={values.description}
+              onChange={(e) => set('description', e.target.value)}
+              rows={3}
+              className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-faint focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
             />
-            <Input
-              id="referenceNextNumber"
-              type="number"
-              min={1}
-              value={values.referenceNextNumber}
-              onChange={(e) => set('referenceNextNumber', e.target.value)}
-              placeholder="Next number"
-            />
-            <Input
-              id="referencePadding"
-              type="number"
-              min={1}
-              max={10}
-              value={values.referencePadding}
-              onChange={(e) => set('referencePadding', e.target.value)}
-              placeholder="Digits"
-            />
+          </Field>
+
+          <Field label="Poster Image" htmlFor="posterImage" hint="Optional — JPEG, PNG, WEBP or GIF, up to 5MB">
+            <div className="flex items-center gap-3">
+              {values.posterUrl && (
+                <img
+                  src={values.posterUrl}
+                  alt="Poster preview"
+                  className="h-16 w-16 rounded-card border border-border object-cover"
+                />
+              )}
+              <div className="flex flex-col gap-1">
+                <input
+                  id="posterImage"
+                  ref={posterInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handlePosterChange}
+                  disabled={isUploadingPoster}
+                  className="text-sm text-text-primary file:mr-3 file:rounded-card file:border-0 file:bg-table-alt file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-text-primary hover:file:bg-border"
+                />
+                {isUploadingPoster && <p className="text-xs text-text-faint">Uploading…</p>}
+                {values.posterUrl && !isUploadingPoster && (
+                  <button
+                    type="button"
+                    onClick={() => set('posterUrl', '')}
+                    className="self-start text-xs text-red hover:underline"
+                  >
+                    Remove image
+                  </button>
+                )}
+              </div>
+            </div>
+          </Field>
+
+          <Field label="Location" htmlFor="location">
+            <Input id="location" value={values.location} onChange={(e) => set('location', e.target.value)} required />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Start Date" htmlFor="startDate">
+              <Input id="startDate" type="date" value={values.startDate} onChange={(e) => set('startDate', e.target.value)} required />
+            </Field>
+            <Field label="End Date" htmlFor="endDate" hint="Leave blank for a single-day event">
+              <Input id="endDate" type="date" value={values.endDate} onChange={(e) => set('endDate', e.target.value)} min={values.startDate} />
+            </Field>
           </div>
-          {values.referencePrefix.trim() && (
-            <p className="mt-1.5 text-xs text-text-faint">
-              Next reference: {values.referencePrefix.trim()}
-              {String(Number(values.referenceNextNumber) || 1).padStart(Number(values.referencePadding) || 4, '0')}
-            </p>
-          )}
-        </Field>
 
-        {error && <p className="text-sm text-red">{error}</p>}
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Start Time" htmlFor="startTime" hint="Optional">
+              <Input id="startTime" type="time" value={values.startTime} onChange={(e) => set('startTime', e.target.value)} />
+            </Field>
+            <Field label="End Time" htmlFor="endTime" hint="Optional">
+              <Input id="endTime" type="time" value={values.endTime} onChange={(e) => set('endTime', e.target.value)} />
+            </Field>
+          </div>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={isSubmitting} disabled={isUploadingPoster}>
-            {submitLabel}
-          </Button>
+          <Field label="Status" htmlFor="status">
+            <select
+              id="status"
+              value={values.status}
+              onChange={(e) => set('status', e.target.value as EventStatus)}
+              className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
-      </form>
-    </>
+      )}
+
+      {tab === 'registration' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Registration Deadline" htmlFor="registrationDeadline" hint="Optional">
+              <Input
+                id="registrationDeadline"
+                type="date"
+                value={values.registrationDeadline}
+                onChange={(e) => set('registrationDeadline', e.target.value)}
+              />
+            </Field>
+            <Field label="Max Participants" htmlFor="maxParticipants" hint="Optional — leave blank for unlimited">
+              <Input
+                id="maxParticipants"
+                type="number"
+                min={1}
+                value={values.maxParticipants}
+                onChange={(e) => set('maxParticipants', e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="Reference Number Series"
+            htmlFor="referencePrefix"
+            hint="Optional — leave the prefix blank to use a random 10-digit reference number instead"
+          >
+            <div className="grid grid-cols-3 gap-2">
+              <Input
+                id="referencePrefix"
+                value={values.referencePrefix}
+                onChange={(e) => set('referencePrefix', e.target.value)}
+                placeholder="Prefix, e.g. REG-2026-"
+                className="col-span-3 sm:col-span-1"
+              />
+              <Input
+                id="referenceNextNumber"
+                type="number"
+                min={1}
+                value={values.referenceNextNumber}
+                onChange={(e) => set('referenceNextNumber', e.target.value)}
+                placeholder="Next number"
+              />
+              <Input
+                id="referencePadding"
+                type="number"
+                min={1}
+                max={10}
+                value={values.referencePadding}
+                onChange={(e) => set('referencePadding', e.target.value)}
+                placeholder="Digits"
+              />
+            </div>
+            {values.referencePrefix.trim() && (
+              <p className="mt-1.5 text-xs text-text-faint">
+                Next reference: {values.referencePrefix.trim()}
+                {String(Number(values.referenceNextNumber) || 1).padStart(Number(values.referencePadding) || 4, '0')}
+              </p>
+            )}
+          </Field>
+        </div>
+      )}
+
+      {tab === 'message' && (
+        <div className="space-y-4">
+          <Field
+            label="WhatsApp Message Template"
+            htmlFor="messageTemplate"
+            hint={'Placeholders: {{name}}, {{eventName}}, {{location}}, {{startDate}}, {{referenceNumber}}, or any form field label, e.g. {{Full Name}}'}
+          >
+            <textarea
+              id="messageTemplate"
+              value={values.messageTemplate}
+              onChange={(e) => set('messageTemplate', e.target.value)}
+              rows={10}
+              className="w-full rounded-card border border-border bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-faint focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+            />
+          </Field>
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red">{error}</p>}
+
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" loading={isSubmitting} disabled={isUploadingPoster}>
+          {submitLabel}
+        </Button>
+      </div>
+    </form>
   );
 }
