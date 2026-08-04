@@ -24,6 +24,12 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   phone: string | null;
 
+  /** Login identifier for users without an email/phone-based flow — set by an
+   *  admin at creation time. Login accepts email, phone, OR username. */
+  @Index({ unique: true, where: '"username" IS NOT NULL' })
+  @Column({ type: 'varchar', nullable: true })
+  username: string | null;
+
   /** Nullable so phone/OTP-only accounts never need a password. */
   @Column({ type: 'varchar', nullable: true, select: false })
   password_hash: string | null;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { KeyRound, Pencil, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { usersApi } from '@/api/users.api';
@@ -7,6 +7,8 @@ import { getApiErrorMessage } from '@/api/http';
 import { useRoleLabelsStore } from '@/stores/useRoleLabelsStore';
 import { PERMISSION_LABELS } from '@/types/permission';
 import { UserFormDrawer } from './UserFormDrawer';
+import { ResetPasswordDialog } from './ResetPasswordDialog';
+import { ResetPasswordResultModal } from './ResetPasswordResultModal';
 import type { UserRecord, UserStatus } from '@/types/user';
 
 const STATUS_TONE: Record<UserStatus, 'green' | 'red' | 'amber'> = {
@@ -20,6 +22,8 @@ export function UsersPage() {
   const [users, setUsers] = useState<UserRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerUser, setDrawerUser] = useState<UserRecord | 'new' | null>(null);
+  const [resetTarget, setResetTarget] = useState<UserRecord | null>(null);
+  const [resetResult, setResetResult] = useState<{ user: UserRecord; password: string } | null>(null);
 
   function loadUsers() {
     usersApi
@@ -33,6 +37,17 @@ export function UsersPage() {
   function handleSaved() {
     setDrawerUser(null);
     loadUsers();
+  }
+
+  async function handleConfirmReset(customPassword?: string) {
+    if (!resetTarget) return;
+    try {
+      const { password } = await usersApi.resetPassword(resetTarget.id, customPassword);
+      setResetResult({ user: resetTarget, password });
+      setResetTarget(null);
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err, 'Could not reset password'));
+    }
   }
 
   return (
@@ -64,7 +79,7 @@ export function UsersPage() {
             {users?.map((user) => (
               <tr key={user.id} className="border-t border-border">
                 <td className="px-4 py-3 font-medium text-text-primary">{user.name}</td>
-                <td className="px-4 py-3 text-text-muted">{user.email ?? user.phone ?? '—'}</td>
+                <td className="px-4 py-3 text-text-muted">{user.email ?? user.phone ?? user.username ?? '—'}</td>
                 <td className="px-4 py-3 text-text-muted">{roleLabels[user.role]}</td>
                 <td className="px-4 py-3 text-text-muted">{user.region ?? '—'}</td>
                 <td className="px-4 py-3">
@@ -82,14 +97,24 @@ export function UsersPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => setDrawerUser(user)}
-                    aria-label="Edit user"
-                    className="text-text-faint hover:text-blue"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
+                  <div className="flex justify-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setDrawerUser(user)}
+                      aria-label="Edit user"
+                      className="text-text-faint hover:text-blue"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setResetTarget(user)}
+                      aria-label="Reset password"
+                      className="text-text-faint hover:text-blue"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -111,6 +136,21 @@ export function UsersPage() {
           user={drawerUser === 'new' ? undefined : drawerUser}
           onClose={() => setDrawerUser(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      <ResetPasswordDialog
+        open={resetTarget !== null}
+        user={resetTarget}
+        onConfirm={handleConfirmReset}
+        onCancel={() => setResetTarget(null)}
+      />
+
+      {resetResult && (
+        <ResetPasswordResultModal
+          user={resetResult.user}
+          password={resetResult.password}
+          onClose={() => setResetResult(null)}
         />
       )}
     </div>

@@ -3,6 +3,7 @@ import { Role, UserStatus } from '../../../common/enums/role.enum';
 import { Permission } from '../../../common/enums/permission.enum';
 
 const PHONE_REGEX = /^\d{10}$/;
+const USERNAME_REGEX = /^[a-zA-Z0-9_.]+$/;
 
 export class UpdateUserDto {
   @IsOptional()
@@ -17,6 +18,12 @@ export class UpdateUserDto {
   @IsOptional()
   @Matches(PHONE_REGEX, { message: 'Phone must be a 10-digit number' })
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @Matches(USERNAME_REGEX, { message: 'Username can only contain letters, numbers, "_" and "."' })
+  username?: string;
 
   /** Admin-initiated password reset — leave unset to keep the current password. */
   @IsOptional()

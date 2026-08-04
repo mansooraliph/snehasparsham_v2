@@ -19,7 +19,7 @@ export function LoginPage() {
   const clearError = useAuthStore((s) => s.clearError);
 
   const [method, setMethod] = useState<LoginMethod>('password');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
@@ -38,7 +38,7 @@ export function LoginPage() {
   async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault();
     try {
-      const redirectTo = await loginWithPassword(email.trim(), password);
+      const redirectTo = await loginWithPassword(identifier.trim(), password);
       navigate(redirectTo, { replace: true });
     } catch {
       // error surfaced via store
@@ -71,7 +71,7 @@ export function LoginPage() {
               method === 'password' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted'
             }`}
           >
-            Email / Password
+            Password
           </button>
           <button
             type="button"
@@ -86,14 +86,14 @@ export function LoginPage() {
 
         {method === 'password' && (
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <Field label="Email" htmlFor="email">
+            <Field label="Email, Phone, or Username" htmlFor="identifier">
               <Input
-                id="email"
-                type="email"
+                id="identifier"
+                type="text"
                 autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="you@example.com, 9876543210, or username"
                 required
               />
             </Field>

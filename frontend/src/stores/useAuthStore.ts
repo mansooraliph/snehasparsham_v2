@@ -11,7 +11,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
-  loginWithPassword: (email: string, password: string) => Promise<string>;
+  loginWithPassword: (identifier: string, password: string) => Promise<string>;
   sendOtp: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, code: string) => Promise<string>;
   logout: () => Promise<void>;
@@ -25,15 +25,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: false,
   error: null,
 
-  loginWithPassword: async (email, password) => {
+  loginWithPassword: async (identifier, password) => {
     set({ isLoading: true, error: null });
     try {
-      const session = await authApi.login(email, password);
+      const session = await authApi.login(identifier, password);
       localStorage.setItem(TOKEN_KEY, session.accessToken);
       set({ user: session.user, isAuthenticated: true, isLoading: false });
       return session.redirectTo;
     } catch (err) {
-      set({ isLoading: false, error: getApiErrorMessage(err, 'Invalid email or password') });
+      set({ isLoading: false, error: getApiErrorMessage(err, 'Invalid credentials') });
       throw err;
     }
   },

@@ -8,6 +8,7 @@ export interface UserRecord {
   name: string;
   email: string | null;
   phone: string | null;
+  username: string | null;
   role: Role;
   region: string | null;
   status: UserStatus;
@@ -20,6 +21,7 @@ export interface CreateUserInput {
   name: string;
   email?: string;
   phone?: string;
+  username?: string;
   password: string;
   role: Role;
   region?: string;
@@ -31,6 +33,7 @@ export interface UpdateUserInput {
   name?: string;
   email?: string;
   phone?: string;
+  username?: string;
   newPassword?: string;
   role?: Role;
   region?: string;

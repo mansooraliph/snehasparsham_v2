@@ -6,6 +6,7 @@ import { Permission } from '../../common/enums/permission.enum';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ResetPasswordByAdminDto } from './dto/reset-password-by-admin.dto';
 
 /** Only these two roles manage users by default; @RequirePermissions grants the
  *  same access to anyone else explicitly given MANAGE_USERS. */
@@ -30,5 +31,11 @@ export class UsersController {
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.users.updateByAdmin(id, dto);
+  }
+
+  @Post(':id/reset-password')
+  async resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordByAdminDto) {
+    const password = await this.users.resetPasswordByAdmin(id, dto.password);
+    return { password };
   }
 }

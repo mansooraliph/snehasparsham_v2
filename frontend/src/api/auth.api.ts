@@ -2,8 +2,8 @@ import { http } from './http';
 import type { SessionResponse } from '@/types/auth';
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    http.post<SessionResponse>('/auth/login', { email, password }).then((r) => r.data),
+  login: (identifier: string, password: string) =>
+    http.post<SessionResponse>('/auth/login', { identifier, password }).then((r) => r.data),
 
   sendOtp: (phone: string) => http.post<{ success: true; message: string }>('/auth/otp/send', { phone }).then((r) => r.data),
 

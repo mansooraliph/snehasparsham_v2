@@ -41,6 +41,7 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
+  const [username, setUsername] = useState(user?.username ?? '');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>(user?.role ?? 'volunteer');
   const [region, setRegion] = useState(user?.region ?? '');
@@ -63,6 +64,7 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
             name: name.trim(),
             email: email.trim() || undefined,
             phone: phone.trim() || undefined,
+            username: username.trim() || undefined,
             newPassword: password || undefined,
             role,
             region: region.trim() || undefined,
@@ -73,6 +75,7 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
             name: name.trim(),
             email: email.trim() || undefined,
             phone: phone.trim() || undefined,
+            username: username.trim() || undefined,
             password,
             role,
             region: region.trim() || undefined,
@@ -94,7 +97,7 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </Field>
 
-          <Field label="Email" htmlFor="email" hint="At least one of email or phone is required">
+          <Field label="Email" htmlFor="email" hint="At least one of email, phone, or username is required">
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
 
@@ -106,6 +109,15 @@ export function UserFormDrawer({ open, user, onClose, onSaved }: UserFormDrawerP
               maxLength={10}
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+            />
+          </Field>
+
+          <Field label="Username" htmlFor="username" hint="Optional — an alternate login ID besides email/phone">
+            <Input
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g. jdoe"
             />
           </Field>
 

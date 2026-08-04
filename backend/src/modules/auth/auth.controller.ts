@@ -29,7 +29,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 15 * 60 * 1000 } })
   @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.login(dto.email, dto.password);
+    const result = await this.auth.login(dto.identifier, dto.password);
     return this.respondWithSession(res, result);
   }
 

@@ -48,11 +48,11 @@ export class AuthService {
 
   // ──────────────────────────── EMAIL + PASSWORD ───────────────────────────
 
-  async login(email: string, password: string): Promise<AuthResult> {
+  async login(identifier: string, password: string): Promise<AuthResult> {
     const invalid = () =>
-      new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' });
+      new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' });
 
-    const user = await this.users.findByEmail(email);
+    const user = await this.users.findByIdentifier(identifier);
     if (!user || !user.password_hash || !(await bcrypt.compare(password, user.password_hash))) {
       throw invalid();
     }
