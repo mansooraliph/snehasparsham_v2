@@ -7,6 +7,8 @@ export interface AdminResponseRow {
   referenceNumber: string;
   submittedAt: string;
   values: Record<string, EventFieldValue>;
+  status: { id: string; name: string; tone: string } | null;
+  assignee: { id: string; name: string } | null;
 }
 
 export interface EventResponsesListing {
@@ -25,6 +27,16 @@ export const eventResponsesApi = {
   update: (eventId: string, responseId: string, values: Record<string, EventFieldValue>) =>
     http
       .patch<AdminResponseRow>(`/events/${eventId}/responses/${responseId}`, { values })
+      .then((r) => r.data),
+
+  setStatus: (eventId: string, responseId: string, statusId: string | null) =>
+    http
+      .patch<AdminResponseRow>(`/events/${eventId}/responses/${responseId}/status`, { statusId })
+      .then((r) => r.data),
+
+  setAssignee: (eventId: string, responseId: string, userId: string | null) =>
+    http
+      .patch<AdminResponseRow>(`/events/${eventId}/responses/${responseId}/assign`, { userId })
       .then((r) => r.data),
 
   /** Triggers a CSV file download via a plain navigation (auth header can't ride along

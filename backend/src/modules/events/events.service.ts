@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { Event } from '../../database/entities/event.entity';
 import { EventStatus } from '../../common/enums/event-status.enum';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -108,8 +108,38 @@ export class EventsService {
     return this.events.save(copy);
   }
 
+  /** Admin dashboard — event counts by status plus how many published events are still upcoming. */
+  async getStats(): Promise<{ total: number; byStatus: Record<EventStatus, number>; upcoming: number }> {
+    const rows = await this.events
+      .createQueryBuilder('e')
+      .select('e.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('e.status')
+      .getRawMany<{ status: EventStatus; count: string }>();
+
+    const byStatus = Object.fromEntries(Object.values(EventStatus).map((s) => [s, 0])) as Record<
+      EventStatus,
+      number
+    >;
+    let total = 0;
+    for (const row of rows) {
+      byStatus[row.status] = Number(row.count);
+      total += Number(row.count);
+    }
+
+    const upcoming = await this.events.count({
+      where: { status: EventStatus.PUBLISHED, start_date: MoreThanOrEqual(todayIso()) },
+    });
+
+    return { total, byStatus, upcoming };
+  }
+
   private assertOwnerOrElevated(_event: Event, _requesterId: string): void {
     // Region-scoped ownership checks are an open item (CLAUDE.md — District/State
     // Admin scoping). Every admin role can manage every event until that's decided.
   }
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }

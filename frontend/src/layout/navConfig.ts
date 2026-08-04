@@ -1,4 +1,4 @@
-import { LayoutDashboard, CalendarDays, Users } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Users, Tags } from 'lucide-react';
 import type { Role } from '@/types/auth';
 
 export interface NavItem {
@@ -17,6 +17,7 @@ export function navItemsForRole(role: Role): NavItem[] {
 
   if (EVENT_ADMIN_ROLES.includes(role)) {
     items.push({ label: 'Events', path: '/admin/events', icon: CalendarDays });
+    items.push({ label: 'Response Statuses', path: '/admin/response-statuses', icon: Tags });
   }
   if (USER_ADMIN_ROLES.includes(role)) {
     items.push({ label: 'Users', path: '/admin/users', icon: Users });

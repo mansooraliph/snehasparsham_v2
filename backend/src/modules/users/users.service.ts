@@ -77,6 +77,23 @@ export class UsersService {
     return this.users.find({ order: { created_at: 'DESC' } });
   }
 
+  /** Admin dashboard — user counts by role and by status. */
+  async getStats(): Promise<{ total: number; byRole: Record<Role, number>; byStatus: Record<UserStatus, number> }> {
+    const [roleRows, statusRows, total] = await Promise.all([
+      this.users.createQueryBuilder('u').select('u.role', 'role').addSelect('COUNT(*)', 'count').groupBy('u.role').getRawMany<{ role: Role; count: string }>(),
+      this.users.createQueryBuilder('u').select('u.status', 'status').addSelect('COUNT(*)', 'count').groupBy('u.status').getRawMany<{ status: UserStatus; count: string }>(),
+      this.users.count(),
+    ]);
+
+    const byRole = Object.fromEntries(Object.values(Role).map((r) => [r, 0])) as Record<Role, number>;
+    for (const row of roleRows) byRole[row.role] = Number(row.count);
+
+    const byStatus = Object.fromEntries(Object.values(UserStatus).map((s) => [s, 0])) as Record<UserStatus, number>;
+    for (const row of statusRows) byStatus[row.status] = Number(row.count);
+
+    return { total, byRole, byStatus };
+  }
+
   async createByAdmin(dto: CreateUserDto): Promise<User> {
     if (!dto.email && !dto.phone) {
       throw new UnprocessableEntityException({

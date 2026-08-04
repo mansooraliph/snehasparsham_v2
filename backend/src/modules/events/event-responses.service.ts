@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,6 +6,8 @@ import { randomInt } from 'crypto';
 import { EventResponse } from '../../database/entities/event-response.entity';
 import { EventResponseValue } from '../../database/entities/event-response-value.entity';
 import { EventFormField } from '../../database/entities/event-form-field.entity';
+import { ResponseStatus } from '../../database/entities/response-status.entity';
+import { User } from '../../database/entities/user.entity';
 import { EventFieldType } from '../../common/enums/event-field-type.enum';
 import { EventsService } from './events.service';
 import { EventFieldsService } from './event-fields.service';
@@ -16,6 +18,8 @@ export interface AdminResponseRow {
   referenceNumber: string;
   submittedAt: Date;
   values: Record<string, EventFieldValue>;
+  status: { id: string; name: string; tone: string } | null;
+  assignee: { id: string; name: string } | null;
 }
 
 /** 10-digit numeric code, e.g. "4839201576" — ~9 billion combinations. */
@@ -32,6 +36,10 @@ export class EventResponsesService {
     private readonly responses: Repository<EventResponse>,
     @InjectRepository(EventResponseValue)
     private readonly values: Repository<EventResponseValue>,
+    @InjectRepository(ResponseStatus)
+    private readonly statuses: Repository<ResponseStatus>,
+    @InjectRepository(User)
+    private readonly users: Repository<User>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly eventsService: EventsService,
@@ -40,6 +48,11 @@ export class EventResponsesService {
 
   countForEvent(eventId: string): Promise<number> {
     return this.responses.count({ where: { event_id: eventId } });
+  }
+
+  /** Admin dashboard — total registrations across every event. */
+  countAll(): Promise<number> {
+    return this.responses.count();
   }
 
   /** Public submission (events-registration-module.md §3.4) — no login, no duplicate check. */
@@ -93,10 +106,7 @@ export class EventResponsesService {
 
   /** Admin edit — overwrites values for an existing response (events-registration-module.md scope: admin data correction). */
   async update(eventId: string, responseId: string, dto: SubmitEventResponseDto): Promise<AdminResponseRow> {
-    const response = await this.responses.findOne({ where: { id: responseId, event_id: eventId } });
-    if (!response) {
-      throw new BadRequestException({ code: 'NOT_FOUND', message: 'Response not found.' });
-    }
+    const response = await this.findResponseOrThrow(eventId, responseId);
 
     const fields = await this.fieldsService.findAllForEvent(eventId);
     this.assertRequiredFieldsPresent(fields, dto.values);
@@ -117,12 +127,29 @@ export class EventResponsesService {
       if (rows.length) await manager.save(EventResponseValue, rows);
     });
 
-    return {
-      id: responseId,
-      referenceNumber: response.reference_number,
-      submittedAt: response.submitted_at,
-      values: dto.values,
-    };
+    return this.toRow(response, dto.values);
+  }
+
+  async setStatus(eventId: string, responseId: string, statusId: string | null): Promise<AdminResponseRow> {
+    const response = await this.findResponseOrThrow(eventId, responseId);
+    if (statusId) {
+      const status = await this.statuses.findOne({ where: { id: statusId } });
+      if (!status) throw new NotFoundException({ code: 'STATUS_NOT_FOUND', message: 'Response status not found' });
+    }
+    response.status_id = statusId;
+    await this.responses.save(response);
+    return this.toRow(response, await this.currentValues(responseId));
+  }
+
+  async setAssignee(eventId: string, responseId: string, userId: string | null): Promise<AdminResponseRow> {
+    const response = await this.findResponseOrThrow(eventId, responseId);
+    if (userId) {
+      const user = await this.users.findOne({ where: { id: userId } });
+      if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    }
+    response.assigned_to = userId;
+    await this.responses.save(response);
+    return this.toRow(response, await this.currentValues(responseId));
   }
 
   /** Admin listing — every response for the event, values keyed by field id. */
@@ -141,6 +168,8 @@ export class EventResponsesService {
       byResponse.set(v.response_id, list);
     }
 
+    const [statusMap, userMap] = await this.lookupMaps(responses);
+
     return {
       fields,
       responses: responses.map((r) => ({
@@ -150,16 +179,20 @@ export class EventResponsesService {
         values: Object.fromEntries(
           (byResponse.get(r.id) ?? []).map((v) => [v.field_id, safeParse(v.value)]),
         ),
+        status: r.status_id ? statusMap.get(r.status_id) ?? null : null,
+        assignee: r.assigned_to ? userMap.get(r.assigned_to) ?? null : null,
       })),
     };
   }
 
   async exportCsv(eventId: string): Promise<string> {
     const { fields, responses } = await this.findAllForEvent(eventId);
-    const header = ['Reference Number', ...fields.map((f) => f.label), 'Submitted At'];
+    const header = ['Reference Number', ...fields.map((f) => f.label), 'Status', 'Assigned To', 'Submitted At'];
     const rows = responses.map((r) => [
       r.referenceNumber,
       ...fields.map((f) => formatCell(r.values[f.id])),
+      r.status?.name ?? '',
+      r.assignee?.name ?? '',
       r.submittedAt.toISOString(),
     ]);
     return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
@@ -173,6 +206,48 @@ export class EventResponsesService {
       if (!exists) return candidate;
     }
     throw new Error('Could not generate a unique reference number.');
+  }
+
+  private async findResponseOrThrow(eventId: string, responseId: string): Promise<EventResponse> {
+    const response = await this.responses.findOne({ where: { id: responseId, event_id: eventId } });
+    if (!response) {
+      throw new BadRequestException({ code: 'NOT_FOUND', message: 'Response not found.' });
+    }
+    return response;
+  }
+
+  private async currentValues(responseId: string): Promise<Record<string, EventFieldValue>> {
+    const rows = await this.values.find({ where: { response_id: responseId } });
+    return Object.fromEntries(rows.map((v) => [v.field_id, safeParse(v.value)]));
+  }
+
+  private async toRow(response: EventResponse, values: Record<string, EventFieldValue>): Promise<AdminResponseRow> {
+    const [statusMap, userMap] = await this.lookupMaps([response]);
+    return {
+      id: response.id,
+      referenceNumber: response.reference_number,
+      submittedAt: response.submitted_at,
+      values,
+      status: response.status_id ? statusMap.get(response.status_id) ?? null : null,
+      assignee: response.assigned_to ? userMap.get(response.assigned_to) ?? null : null,
+    };
+  }
+
+  private async lookupMaps(
+    responses: EventResponse[],
+  ): Promise<[Map<string, { id: string; name: string; tone: string }>, Map<string, { id: string; name: string }>]> {
+    const statusIds = [...new Set(responses.map((r) => r.status_id).filter((id): id is string => !!id))];
+    const userIds = [...new Set(responses.map((r) => r.assigned_to).filter((id): id is string => !!id))];
+
+    const [statusRows, userRows] = await Promise.all([
+      statusIds.length ? this.statuses.find({ where: { id: In(statusIds) } }) : Promise.resolve([]),
+      userIds.length ? this.users.find({ where: { id: In(userIds) } }) : Promise.resolve([]),
+    ]);
+
+    return [
+      new Map(statusRows.map((s) => [s.id, { id: s.id, name: s.name, tone: s.tone }])),
+      new Map(userRows.map((u) => [u.id, { id: u.id, name: u.name }])),
+    ];
   }
 
   private assertRequiredFieldsPresent(fields: EventFormField[], values: Record<string, EventFieldValue>): void {

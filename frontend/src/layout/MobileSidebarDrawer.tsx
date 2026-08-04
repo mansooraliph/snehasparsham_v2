@@ -6,12 +6,13 @@ interface Props {
   onClose: () => void;
 }
 
+/** "More" sheet opened from the mobile bottom tab bar — same content as the desktop sidebar. */
 export function MobileSidebarDrawer({ open, onClose }: Props) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 md:hidden">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute inset-y-0 left-0 w-60 shadow-lg">
+      <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-hidden rounded-t-2xl shadow-xl">
         <AppSidebarContent onNavigate={onClose} />
         <button
           type="button"

@@ -7,6 +7,8 @@ import { Role } from '../../common/enums/role.enum';
 import { Permission } from '../../common/enums/permission.enum';
 import { EventResponsesService } from './event-responses.service';
 import { SubmitEventResponseDto } from './dto/submit-event-response.dto';
+import { SetResponseStatusDto } from './dto/set-response-status.dto';
+import { AssignResponseDto } from './dto/assign-response.dto';
 
 const EVENT_ADMIN_ROLES = [Role.SUPER_ADMIN, Role.DISTRICT_STATE_ADMIN];
 
@@ -36,6 +38,28 @@ export class EventResponsesController {
     @Body() dto: SubmitEventResponseDto,
   ) {
     return this.responses.update(eventId, responseId, dto);
+  }
+
+  @Roles(...EVENT_ADMIN_ROLES)
+  @RequirePermissions(Permission.MANAGE_RESPONSES)
+  @Patch(':responseId/status')
+  setStatus(
+    @Param('eventId') eventId: string,
+    @Param('responseId') responseId: string,
+    @Body() dto: SetResponseStatusDto,
+  ) {
+    return this.responses.setStatus(eventId, responseId, dto.statusId ?? null);
+  }
+
+  @Roles(...EVENT_ADMIN_ROLES)
+  @RequirePermissions(Permission.MANAGE_RESPONSES)
+  @Patch(':responseId/assign')
+  assign(
+    @Param('eventId') eventId: string,
+    @Param('responseId') responseId: string,
+    @Body() dto: AssignResponseDto,
+  ) {
+    return this.responses.setAssignee(eventId, responseId, dto.userId ?? null);
   }
 
   @Roles(...EVENT_ADMIN_ROLES)

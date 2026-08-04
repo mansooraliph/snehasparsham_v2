@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { MobileSidebarDrawer } from './MobileSidebarDrawer';
+import { MobileBottomNav } from './MobileBottomNav';
 import { AppHeader } from './AppHeader';
 
 const TITLES: Record<string, string> = {
@@ -31,11 +32,12 @@ export function AppLayout() {
       <AppSidebar />
       <MobileSidebarDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <AppHeader title={titleForPath(location.pathname)} onMenuClick={() => setDrawerOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-bg-page p-6">
+        <AppHeader title={titleForPath(location.pathname)} />
+        <main className="flex-1 overflow-y-auto bg-bg-page p-6 pb-20 md:pb-6">
           <Outlet />
         </main>
       </div>
+      <MobileBottomNav onMoreClick={() => setDrawerOpen(true)} />
     </div>
   );
 }

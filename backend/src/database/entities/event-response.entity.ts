@@ -19,6 +19,16 @@ export class EventResponse {
   @Column({ type: 'varchar' })
   reference_number: string;
 
+  /** Admin-configurable workflow status — nullable so pre-existing responses aren't broken by this column. */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  status_id: string | null;
+
+  /** Which admin/staff user is handling this request — any role, picked from the Users list. */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  assigned_to: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   submitted_at: Date;
 }

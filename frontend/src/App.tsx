@@ -7,6 +7,7 @@ import { EventsPage } from '@/pages/Events/EventsPage';
 import { EventFieldsPage } from '@/pages/Events/EventFieldsPage';
 import { EventResponsesPage } from '@/pages/Events/EventResponsesPage';
 import { UsersPage } from '@/pages/Users/UsersPage';
+import { ResponseStatusesPage } from '@/pages/ResponseStatuses/ResponseStatusesPage';
 import { PublicEventsListPage } from '@/pages/PublicEvents/PublicEventsListPage';
 import { PublicEventDetailPage } from '@/pages/PublicEvents/PublicEventDetailPage';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
