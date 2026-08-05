@@ -4,6 +4,7 @@ import { Event } from '../../database/entities/event.entity';
 import { EventFormField } from '../../database/entities/event-form-field.entity';
 import { EventResponse } from '../../database/entities/event-response.entity';
 import { EventResponseValue } from '../../database/entities/event-response-value.entity';
+import { ResponseItem } from '../../database/entities/response-item.entity';
 import { ResponseStatus } from '../../database/entities/response-status.entity';
 import { User } from '../../database/entities/user.entity';
 import { EventsController } from './events.controller';
@@ -16,7 +17,7 @@ import { ResponsesController } from './responses.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Event, EventFormField, EventResponse, EventResponseValue, ResponseStatus, User]),
+    TypeOrmModule.forFeature([Event, EventFormField, EventResponse, EventResponseValue, ResponseItem, ResponseStatus, User]),
   ],
   controllers: [EventsController, EventFieldsController, EventResponsesController, ResponsesController],
   providers: [EventsService, EventFieldsService, EventResponsesService],

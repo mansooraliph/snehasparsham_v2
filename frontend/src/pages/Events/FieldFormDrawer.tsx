@@ -7,7 +7,9 @@ import { Field, Input } from '@/components/ui/Input';
 import { eventFieldsApi } from '@/api/eventFields.api';
 import { getApiErrorMessage } from '@/api/http';
 import { OPTIONS_REQUIRED_FIELD_TYPES } from '@/types/eventField';
-import type { EventFieldType, EventFormFieldRecord } from '@/types/eventField';
+import type { EventFieldType, EventFormFieldRecord, ItemSerialConfigInput } from '@/types/eventField';
+
+const EMPTY_SERIAL: ItemSerialConfigInput = { enabled: false, prefix: '', start: 1 };
 
 const FIELD_TYPE_OPTIONS: { value: EventFieldType; label: string }[] = [
   { value: 'text', label: 'Text' },
@@ -36,17 +38,37 @@ export function FieldFormDrawer({ open, eventId, field, onClose, onSaved }: Fiel
   const [fieldType, setFieldType] = useState<EventFieldType>(field?.field_type ?? 'text');
   const [isRequired, setIsRequired] = useState(field?.is_required ?? false);
   const [options, setOptions] = useState<string[]>(field?.options?.length ? field.options : ['']);
+  const [itemSerial, setItemSerial] = useState<ItemSerialConfigInput[]>(
+    field?.options?.length
+      ? field.options.map((_, i) => field.item_serial_config?.[i] ?? EMPTY_SERIAL)
+      : [EMPTY_SERIAL],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const needsOptions = OPTIONS_REQUIRED_FIELD_TYPES.includes(fieldType);
   const isItemList = fieldType === 'item_list';
 
+  function addOption() {
+    setOptions((o) => [...o, '']);
+    setItemSerial((s) => [...s, { ...EMPTY_SERIAL }]);
+  }
+
+  function removeOption(i: number) {
+    setOptions((o) => o.filter((_, idx) => idx !== i));
+    setItemSerial((s) => s.filter((_, idx) => idx !== i));
+  }
+
+  function updateSerial(i: number, patch: Partial<ItemSerialConfigInput>) {
+    setItemSerial((s) => s.map((cfg, idx) => (idx === i ? { ...cfg, ...patch } : cfg)));
+  }
+
   function resetAndClose() {
     setLabel('');
     setFieldType('text');
     setIsRequired(false);
     setOptions(['']);
+    setItemSerial([{ ...EMPTY_SERIAL }]);
     setError(null);
     onClose();
   }
@@ -62,6 +84,9 @@ export function FieldFormDrawer({ open, eventId, field, onClose, onSaved }: Fiel
         fieldType,
         isRequired,
         options: needsOptions ? cleanOptions : undefined,
+        itemSerialConfig: isItemList
+          ? options.flatMap((o, i) => (o.trim() ? [itemSerial[i] ?? EMPTY_SERIAL] : []))
+          : undefined,
       };
       const saved = isEdit
         ? await eventFieldsApi.update(eventId, field!.id, input)
@@ -103,28 +128,64 @@ export function FieldFormDrawer({ open, eventId, field, onClose, onSaved }: Fiel
               htmlFor="field-options"
               hint={isItemList ? 'One item per row — the responder enters a value against each' : 'One per row'}
             >
-              <div className="space-y-2">
-                {options.map((opt, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input
-                      value={opt}
-                      onChange={(e) => setOptions((o) => o.map((v, idx) => (idx === i ? e.target.value : v)))}
-                      placeholder={isItemList ? `Item ${i + 1}` : `Option ${i + 1}`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setOptions((o) => o.filter((_, idx) => idx !== i))}
-                      aria-label="Remove item"
-                      className="shrink-0 text-text-faint hover:text-red"
-                      disabled={options.length === 1}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                {options.map((opt, i) => {
+                  const serial = itemSerial[i] ?? EMPTY_SERIAL;
+                  return (
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <Input
+                          value={opt}
+                          onChange={(e) => setOptions((o) => o.map((v, idx) => (idx === i ? e.target.value : v)))}
+                          placeholder={isItemList ? `Item ${i + 1}` : `Option ${i + 1}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeOption(i)}
+                          aria-label="Remove item"
+                          className="shrink-0 text-text-faint hover:text-red"
+                          disabled={options.length === 1}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {isItemList && (
+                        <div className="ml-1 flex flex-wrap items-center gap-3 rounded-card bg-table-head/50 px-3 py-2">
+                          <label className="flex items-center gap-1.5 text-xs text-text-primary">
+                            <input
+                              type="checkbox"
+                              checked={serial.enabled}
+                              onChange={(e) => updateSerial(i, { enabled: e.target.checked })}
+                              className="h-3.5 w-3.5 rounded border-border text-blue focus:ring-blue"
+                            />
+                            Auto Serial Number
+                          </label>
+                          {serial.enabled && (
+                            <>
+                              <input
+                                value={serial.prefix ?? ''}
+                                onChange={(e) => updateSerial(i, { prefix: e.target.value })}
+                                placeholder="Prefix (e.g. RB-)"
+                                className="w-32 rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                              />
+                              <input
+                                type="number"
+                                min={1}
+                                value={serial.start ?? 1}
+                                onChange={(e) => updateSerial(i, { start: Math.max(1, Number(e.target.value) || 1) })}
+                                placeholder="Start #"
+                                className="w-20 rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                              />
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 <button
                   type="button"
-                  onClick={() => setOptions((o) => [...o, ''])}
+                  onClick={addOption}
                   className="flex items-center gap-1 text-sm font-medium text-blue hover:underline"
                 >
                   <Plus className="h-3.5 w-3.5" />

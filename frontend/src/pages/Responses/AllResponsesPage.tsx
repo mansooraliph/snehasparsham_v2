@@ -76,6 +76,16 @@ export function AllResponsesPage() {
     patchResponse(row.id, { assignee: updated.assignee });
   }
 
+  async function handleItemStatusChange(row: CrossEventResponseRow, itemId: string, statusId: string) {
+    const updated = await eventResponsesApi.setItemStatus(row.event.id, row.id, itemId, statusId || null);
+    patchResponse(row.id, { items: updated.items });
+  }
+
+  async function handleItemAssigneeChange(row: CrossEventResponseRow, itemId: string, userId: string) {
+    const updated = await eventResponsesApi.setItemAssignee(row.event.id, row.id, itemId, userId || null);
+    patchResponse(row.id, { items: updated.items });
+  }
+
   async function ensureFields(eventId: string): Promise<EventFormFieldRecord[]> {
     const cached = fieldsByEvent[eventId];
     if (cached) return cached;
@@ -135,7 +145,12 @@ export function AllResponsesPage() {
     if (!responses) return [];
     const q = search.trim().toLowerCase();
     if (!q) return responses;
-    return responses.filter((r) => r.referenceNumber.toLowerCase().includes(q) || r.event.name.toLowerCase().includes(q));
+    return responses.filter((r) => {
+      const haystack = [r.referenceNumber, r.event.name, ...r.items.flatMap((i) => [i.itemLabel, i.value, ...i.codes])]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
   }, [responses, search]);
 
   const hasActiveFilters = filters.eventId || filters.assigneeId || filters.dateFrom || filters.dateTo || search;
@@ -253,106 +268,180 @@ export function AllResponsesPage() {
               <th className="px-4 py-3" />
               <th className="px-4 py-3">Event</th>
               <th className="px-4 py-3">Reference #</th>
+              <th className="whitespace-nowrap px-4 py-3">Item</th>
               <th className="whitespace-nowrap px-4 py-3">Status</th>
               <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
               <th className="px-4 py-3">Submitted At</th>
             </tr>
           </thead>
           <tbody>
-            {filteredResponses.map((response, index) => (
-              <tr key={response.id} className="border-t border-border hover:bg-table-head">
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(response.id)}
-                    onChange={() => toggleSelected(response.id)}
-                    aria-label="Select response"
-                    className="rounded text-blue focus:ring-blue"
-                  />
-                </td>
-                <td className="px-4 py-3 text-text-muted">{index + 1}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-start gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openDrawer(response, false)}
-                      aria-label="View response"
-                      className="text-text-faint hover:text-blue"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openDrawer(response, true)}
-                      aria-label="Edit response"
-                      className="text-text-faint hover:text-blue"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openWhatsApp(response)}
-                      aria-label="Share on WhatsApp"
-                      className="text-text-faint hover:text-green"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/events/${response.event.id}/responses`)}
-                      aria-label="Open in event"
-                      className="text-text-faint hover:text-blue"
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(response)}
-                      aria-label="Delete response"
-                      className="text-text-faint hover:text-red"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-                <td className="px-4 py-3 font-medium text-text-primary">{response.event.name}</td>
-                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted">{response.referenceNumber}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
+            {filteredResponses.map((response, index) => {
+              const rowSpan = Math.max(response.items.length, 1);
+
+              function sharedCells() {
+                return (
+                  <>
+                    <td className="px-4 py-3" rowSpan={rowSpan}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(response.id)}
+                        onChange={() => toggleSelected(response.id)}
+                        aria-label="Select response"
+                        className="rounded text-blue focus:ring-blue"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-text-muted" rowSpan={rowSpan}>
+                      {index + 1}
+                    </td>
+                    <td className="px-4 py-3" rowSpan={rowSpan}>
+                      <div className="flex items-center justify-start gap-3">
+                        <button
+                          type="button"
+                          onClick={() => openDrawer(response, false)}
+                          aria-label="View response"
+                          className="text-text-faint hover:text-blue"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDrawer(response, true)}
+                          aria-label="Edit response"
+                          className="text-text-faint hover:text-blue"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openWhatsApp(response)}
+                          aria-label="Share on WhatsApp"
+                          className="text-text-faint hover:text-green"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/admin/events/${response.event.id}/responses`)}
+                          aria-label="Open in event"
+                          className="text-text-faint hover:text-blue"
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(response)}
+                          aria-label="Delete response"
+                          className="text-text-faint hover:text-red"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-text-primary" rowSpan={rowSpan}>
+                      {response.event.name}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted" rowSpan={rowSpan}>
+                      {response.referenceNumber}
+                    </td>
+                  </>
+                );
+              }
+
+              if (response.items.length === 0) {
+                return (
+                  <tr key={response.id} className="border-t border-border hover:bg-table-head">
+                    {sharedCells()}
+                    <td className="px-4 py-3 text-text-faint">—</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
+                        <select
+                          value={response.status?.id ?? ''}
+                          onChange={(e) => handleStatusChange(response, e.target.value)}
+                          className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                        >
+                          <option value="">—</option>
+                          {statuses.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={response.assignee?.id ?? ''}
+                        onChange={(e) => handleAssigneeChange(response, e.target.value)}
+                        className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                      >
+                        <option value="">Unassigned</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-text-muted" rowSpan={rowSpan}>
+                      {new Date(response.submittedAt).toLocaleString()}
+                    </td>
+                  </tr>
+                );
+              }
+
+              return response.items.map((item, itemIndex) => (
+                <tr
+                  key={item.id}
+                  className={`border-border hover:bg-table-head ${itemIndex === 0 ? 'border-t-2' : 'border-t'}`}
+                >
+                  {itemIndex === 0 && sharedCells()}
+                  <td className="px-4 py-3">
+                    <p className="text-text-primary">{item.itemLabel}</p>
+                    <p className="text-xs text-text-muted">
+                      {item.value}
+                      {item.codes.length ? ` · ${item.codes.join(', ')}` : ''}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      {item.status && <Badge tone={item.status.tone}>{item.status.name}</Badge>}
+                      <select
+                        value={item.status?.id ?? ''}
+                        onChange={(e) => handleItemStatusChange(response, item.id, e.target.value)}
+                        className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                      >
+                        <option value="">—</option>
+                        {statuses.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     <select
-                      value={response.status?.id ?? ''}
-                      onChange={(e) => handleStatusChange(response, e.target.value)}
+                      value={item.assignee?.id ?? ''}
+                      onChange={(e) => handleItemAssigneeChange(response, item.id, e.target.value)}
                       className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
                     >
-                      <option value="">—</option>
-                      {statuses.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
+                      <option value="">Unassigned</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
                         </option>
                       ))}
                     </select>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <select
-                    value={response.assignee?.id ?? ''}
-                    onChange={(e) => handleAssigneeChange(response, e.target.value)}
-                    className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
-                  >
-                    <option value="">Unassigned</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-text-muted">
-                  {new Date(response.submittedAt).toLocaleString()}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  {itemIndex === 0 && (
+                    <td className="whitespace-nowrap px-4 py-3 text-text-muted" rowSpan={rowSpan}>
+                      {new Date(response.submittedAt).toLocaleString()}
+                    </td>
+                  )}
+                </tr>
+              ));
+            })}
           </tbody>
         </table>
 

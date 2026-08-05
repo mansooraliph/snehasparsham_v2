@@ -1,5 +1,5 @@
 import type { ResponseStatusTone } from './responseStatus';
-import type { EventFieldValue } from './eventField';
+import type { EventFieldValue, ResponseItemRow } from './eventField';
 
 export interface CrossEventResponseRow {
   id: string;
@@ -9,6 +9,7 @@ export interface CrossEventResponseRow {
   status: { id: string; name: string; tone: ResponseStatusTone } | null;
   assignee: { id: string; name: string } | null;
   event: { id: string; name: string };
+  items: ResponseItemRow[];
 }
 
 export interface ResponseFilters {

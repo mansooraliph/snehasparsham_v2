@@ -1,18 +1,30 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { Between, DataSource, EntityManager, In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt } from 'crypto';
 import { Event } from '../../database/entities/event.entity';
 import { EventResponse } from '../../database/entities/event-response.entity';
 import { EventResponseValue } from '../../database/entities/event-response-value.entity';
 import { EventFormField } from '../../database/entities/event-form-field.entity';
+import { ResponseItem } from '../../database/entities/response-item.entity';
 import { ResponseStatus } from '../../database/entities/response-status.entity';
 import { User } from '../../database/entities/user.entity';
 import { EventFieldType } from '../../common/enums/event-field-type.enum';
 import { EventsService } from './events.service';
 import { EventFieldsService } from './event-fields.service';
-import { EventFieldValue, SubmitEventResponseDto } from './dto/submit-event-response.dto';
+import { EventFieldValue, ItemListEntry, SubmitEventResponseDto } from './dto/submit-event-response.dto';
+
+export interface ResponseItemRow {
+  id: string;
+  fieldId: string;
+  fieldLabel: string;
+  itemLabel: string;
+  value: string;
+  codes: string[];
+  status: { id: string; name: string; tone: string } | null;
+  assignee: { id: string; name: string } | null;
+}
 
 export interface AdminResponseRow {
   id: string;
@@ -21,6 +33,7 @@ export interface AdminResponseRow {
   values: Record<string, EventFieldValue>;
   status: { id: string; name: string; tone: string } | null;
   assignee: { id: string; name: string } | null;
+  items: ResponseItemRow[];
 }
 
 export interface CrossEventResponseRow {
@@ -31,6 +44,7 @@ export interface CrossEventResponseRow {
   status: { id: string; name: string; tone: string } | null;
   assignee: { id: string; name: string } | null;
   event: { id: string; name: string };
+  items: ResponseItemRow[];
 }
 
 export interface CrossEventResponseFilters {
@@ -55,6 +69,10 @@ export class EventResponsesService {
     private readonly responses: Repository<EventResponse>,
     @InjectRepository(EventResponseValue)
     private readonly values: Repository<EventResponseValue>,
+    @InjectRepository(ResponseItem)
+    private readonly items: Repository<ResponseItem>,
+    @InjectRepository(EventFormField)
+    private readonly formFields: Repository<EventFormField>,
     @InjectRepository(ResponseStatus)
     private readonly statuses: Repository<ResponseStatus>,
     @InjectRepository(User)
@@ -77,7 +95,10 @@ export class EventResponsesService {
   }
 
   /** Public submission (events-registration-module.md §3.4) — no login, no duplicate check. */
-  async submit(eventId: string, dto: SubmitEventResponseDto): Promise<{ id: string; referenceNumber: string }> {
+  async submit(
+    eventId: string,
+    dto: SubmitEventResponseDto,
+  ): Promise<{ id: string; referenceNumber: string; values: Record<string, EventFieldValue> }> {
     // 404s on anything not Published — same guard the public detail page uses.
     const event = await this.eventsService.findPublishedOne(eventId);
 
@@ -101,7 +122,10 @@ export class EventResponsesService {
     const responseId = uuidv4();
     const referenceNumber =
       (await this.eventsService.claimNextReferenceNumber(eventId)) ?? (await this.generateReferenceNumber());
+    let finalValues = dto.values;
     await this.dataSource.transaction(async (manager) => {
+      finalValues = await this.assignItemSerialCodes(fields, dto.values, manager);
+
       await manager.save(EventResponse, {
         id: responseId,
         event_id: eventId,
@@ -110,20 +134,21 @@ export class EventResponsesService {
       });
 
       const rows = fields
-        .filter((field) => dto.values[field.id] !== undefined)
+        .filter((field) => finalValues[field.id] !== undefined)
         .map((field) =>
           manager.create(EventResponseValue, {
             id: uuidv4(),
             response_id: responseId,
             field_id: field.id,
-            value: JSON.stringify(dto.values[field.id]),
+            value: JSON.stringify(finalValues[field.id]),
           }),
         );
       if (rows.length) await manager.save(EventResponseValue, rows);
+      await this.syncResponseItems(responseId, fields, finalValues, manager);
     });
 
-    this.logConfirmation(event.name, fields, dto.values, referenceNumber);
-    return { id: responseId, referenceNumber };
+    this.logConfirmation(event.name, fields, finalValues, referenceNumber);
+    return { id: responseId, referenceNumber, values: finalValues };
   }
 
   /** Admin edit — overwrites values for an existing response (events-registration-module.md scope: admin data correction). */
@@ -133,29 +158,34 @@ export class EventResponsesService {
     const fields = await this.fieldsService.findAllForEvent(eventId);
     this.assertRequiredFieldsPresent(fields, dto.values);
 
+    let finalValues = dto.values;
     await this.dataSource.transaction(async (manager) => {
+      finalValues = await this.assignItemSerialCodes(fields, dto.values, manager);
+
       await manager.delete(EventResponseValue, { response_id: responseId });
 
       const rows = fields
-        .filter((field) => dto.values[field.id] !== undefined)
+        .filter((field) => finalValues[field.id] !== undefined)
         .map((field) =>
           manager.create(EventResponseValue, {
             id: uuidv4(),
             response_id: responseId,
             field_id: field.id,
-            value: JSON.stringify(dto.values[field.id]),
+            value: JSON.stringify(finalValues[field.id]),
           }),
         );
       if (rows.length) await manager.save(EventResponseValue, rows);
+      await this.syncResponseItems(responseId, fields, finalValues, manager);
     });
 
-    return this.toRow(response, dto.values);
+    return this.toRow(response, finalValues);
   }
 
   async remove(eventId: string, responseId: string): Promise<void> {
     await this.findResponseOrThrow(eventId, responseId);
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(EventResponseValue, { response_id: responseId });
+      await manager.delete(ResponseItem, { response_id: responseId });
       await manager.delete(EventResponse, { id: responseId });
     });
   }
@@ -172,6 +202,7 @@ export class EventResponsesService {
 
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(EventResponseValue, { response_id: In(ids) });
+      await manager.delete(ResponseItem, { response_id: In(ids) });
       await manager.delete(EventResponse, { id: In(ids) });
     });
     return { deleted: ids.length };
@@ -199,6 +230,30 @@ export class EventResponsesService {
     return this.toRow(response, await this.currentValues(responseId));
   }
 
+  async setItemStatus(eventId: string, responseId: string, itemId: string, statusId: string | null): Promise<AdminResponseRow> {
+    const response = await this.findResponseOrThrow(eventId, responseId);
+    const item = await this.findResponseItemOrThrow(responseId, itemId);
+    if (statusId) {
+      const status = await this.statuses.findOne({ where: { id: statusId } });
+      if (!status) throw new NotFoundException({ code: 'STATUS_NOT_FOUND', message: 'Response status not found' });
+    }
+    item.status_id = statusId;
+    await this.items.save(item);
+    return this.toRow(response, await this.currentValues(responseId));
+  }
+
+  async setItemAssignee(eventId: string, responseId: string, itemId: string, userId: string | null): Promise<AdminResponseRow> {
+    const response = await this.findResponseOrThrow(eventId, responseId);
+    const item = await this.findResponseItemOrThrow(responseId, itemId);
+    if (userId) {
+      const user = await this.users.findOne({ where: { id: userId } });
+      if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    }
+    item.assigned_to = userId;
+    await this.items.save(item);
+    return this.toRow(response, await this.currentValues(responseId));
+  }
+
   /** Admin listing — every response for the event, values keyed by field id. */
   async findAllForEvent(eventId: string): Promise<{ fields: EventFormField[]; responses: AdminResponseRow[] }> {
     const fields = await this.fieldsService.findAllForEvent(eventId);
@@ -215,20 +270,33 @@ export class EventResponsesService {
       byResponse.set(v.response_id, list);
     }
 
-    const [statusMap, userMap] = await this.lookupMaps(responses);
+    const items = await this.items.find({ where: { response_id: In(responses.map((r) => r.id)) } });
+    const itemsByResponse = new Map<string, ResponseItem[]>();
+    for (const it of items) {
+      const list = itemsByResponse.get(it.response_id) ?? [];
+      list.push(it);
+      itemsByResponse.set(it.response_id, list);
+    }
+
+    const [statusMap, userMap] = await this.lookupMaps(responses, items);
+    const fieldLabelMap = new Map(fields.map((f) => [f.id, f.label]));
 
     return {
       fields,
-      responses: responses.map((r) => ({
-        id: r.id,
-        referenceNumber: r.reference_number,
-        submittedAt: r.submitted_at,
-        values: Object.fromEntries(
+      responses: responses.map((r) => {
+        const values = Object.fromEntries(
           (byResponse.get(r.id) ?? []).map((v) => [v.field_id, safeParse(v.value)]),
-        ),
-        status: r.status_id ? statusMap.get(r.status_id) ?? null : null,
-        assignee: r.assigned_to ? userMap.get(r.assigned_to) ?? null : null,
-      })),
+        );
+        return {
+          id: r.id,
+          referenceNumber: r.reference_number,
+          submittedAt: r.submitted_at,
+          values,
+          status: r.status_id ? statusMap.get(r.status_id) ?? null : null,
+          assignee: r.assigned_to ? userMap.get(r.assigned_to) ?? null : null,
+          items: this.buildItemRows(itemsByResponse.get(r.id) ?? [], values, statusMap, userMap, fieldLabelMap),
+        };
+      }),
     };
   }
 
@@ -250,10 +318,24 @@ export class EventResponsesService {
     const responses = await this.responses.find({ where, order: { submitted_at: 'DESC' } });
     if (responses.length === 0) return [];
 
-    const [statusMap, userMap] = await this.lookupMaps(responses);
+    const items = await this.items.find({ where: { response_id: In(responses.map((r) => r.id)) } });
+    const itemsByResponse = new Map<string, ResponseItem[]>();
+    for (const it of items) {
+      const list = itemsByResponse.get(it.response_id) ?? [];
+      list.push(it);
+      itemsByResponse.set(it.response_id, list);
+    }
+
+    const [statusMap, userMap] = await this.lookupMaps(responses, items);
     const eventIds = [...new Set(responses.map((r) => r.event_id))];
     const eventRows = await this.events.find({ where: { id: In(eventIds) }, select: { id: true, name: true } });
     const eventMap = new Map(eventRows.map((e) => [e.id, { id: e.id, name: e.name }]));
+
+    const fieldIds = [...new Set(items.map((i) => i.field_id))];
+    const fieldRows = fieldIds.length
+      ? await this.formFields.find({ where: { id: In(fieldIds) }, select: { id: true, label: true } })
+      : [];
+    const fieldLabelMap = new Map(fieldRows.map((f) => [f.id, f.label]));
 
     const allValues = await this.values.find({ where: { response_id: In(responses.map((r) => r.id)) } });
     const valuesByResponse = new Map<string, EventResponseValue[]>();
@@ -263,17 +345,21 @@ export class EventResponsesService {
       valuesByResponse.set(v.response_id, list);
     }
 
-    return responses.map((r) => ({
-      id: r.id,
-      referenceNumber: r.reference_number,
-      submittedAt: r.submitted_at,
-      values: Object.fromEntries(
+    return responses.map((r) => {
+      const values = Object.fromEntries(
         (valuesByResponse.get(r.id) ?? []).map((v) => [v.field_id, safeParse(v.value)]),
-      ),
-      status: r.status_id ? statusMap.get(r.status_id) ?? null : null,
-      assignee: r.assigned_to ? userMap.get(r.assigned_to) ?? null : null,
-      event: eventMap.get(r.event_id) ?? { id: r.event_id, name: '(deleted event)' },
-    }));
+      );
+      return {
+        id: r.id,
+        referenceNumber: r.reference_number,
+        submittedAt: r.submitted_at,
+        values,
+        status: r.status_id ? statusMap.get(r.status_id) ?? null : null,
+        assignee: r.assigned_to ? userMap.get(r.assigned_to) ?? null : null,
+        event: eventMap.get(r.event_id) ?? { id: r.event_id, name: '(deleted event)' },
+        items: this.buildItemRows(itemsByResponse.get(r.id) ?? [], values, statusMap, userMap, fieldLabelMap),
+      };
+    });
   }
 
   async exportCsv(eventId: string): Promise<string> {
@@ -313,7 +399,13 @@ export class EventResponsesService {
   }
 
   private async toRow(response: EventResponse, values: Record<string, EventFieldValue>): Promise<AdminResponseRow> {
-    const [statusMap, userMap] = await this.lookupMaps([response]);
+    const items = await this.items.find({ where: { response_id: response.id } });
+    const [statusMap, userMap] = await this.lookupMaps([response], items);
+    const fieldIds = [...new Set(items.map((i) => i.field_id))];
+    const fieldRows = fieldIds.length
+      ? await this.formFields.find({ where: { id: In(fieldIds) }, select: { id: true, label: true } })
+      : [];
+    const fieldLabelMap = new Map(fieldRows.map((f) => [f.id, f.label]));
     return {
       id: response.id,
       referenceNumber: response.reference_number,
@@ -321,14 +413,103 @@ export class EventResponsesService {
       values,
       status: response.status_id ? statusMap.get(response.status_id) ?? null : null,
       assignee: response.assigned_to ? userMap.get(response.assigned_to) ?? null : null,
+      items: this.buildItemRows(items, values, statusMap, userMap, fieldLabelMap),
     };
+  }
+
+  /** Joins each ResponseItem's live value/codes out of the response's parsed field values. */
+  private buildItemRows(
+    items: ResponseItem[],
+    values: Record<string, EventFieldValue>,
+    statusMap: Map<string, { id: string; name: string; tone: string }>,
+    userMap: Map<string, { id: string; name: string }>,
+    fieldLabelMap: Map<string, string>,
+  ): ResponseItemRow[] {
+    return items.map((item) => {
+      const raw = values[item.field_id];
+      const entries = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, ItemListEntry>) : {};
+      const entry = entries[item.item_label];
+      return {
+        id: item.id,
+        fieldId: item.field_id,
+        fieldLabel: fieldLabelMap.get(item.field_id) ?? '',
+        itemLabel: item.item_label,
+        value: entry?.value ?? '',
+        codes: entry?.codes ?? [],
+        status: item.status_id ? statusMap.get(item.status_id) ?? null : null,
+        assignee: item.assigned_to ? userMap.get(item.assigned_to) ?? null : null,
+      };
+    });
+  }
+
+  private async findResponseItemOrThrow(responseId: string, itemId: string): Promise<ResponseItem> {
+    const item = await this.items.findOne({ where: { id: itemId, response_id: responseId } });
+    if (!item) {
+      throw new BadRequestException({ code: 'NOT_FOUND', message: 'Response item not found.' });
+    }
+    return item;
+  }
+
+  /** For item_list fields: keeps the ResponseItem rows (per-item status/assignee tracking) in sync
+   *  with whatever items are actually filled in — inserts new ones without touching existing
+   *  status/assignee, and drops rows for items the admin removed on edit. Runs inside the caller's
+   *  transaction so it's atomic with the response/value write. */
+  private async syncResponseItems(
+    responseId: string,
+    fields: EventFormField[],
+    values: Record<string, EventFieldValue>,
+    manager: EntityManager,
+  ): Promise<void> {
+    const itemFields = fields.filter((f) => f.field_type === EventFieldType.ITEM_LIST);
+    const existing = await manager.find(ResponseItem, { where: { response_id: responseId } });
+    const existingByKey = new Map(existing.map((i) => [`${i.field_id}:${i.item_label}`, i]));
+    const seenKeys = new Set<string>();
+    const toInsert: ResponseItem[] = [];
+
+    for (const field of itemFields) {
+      const raw = values[field.id];
+      if (!raw || Array.isArray(raw) || typeof raw !== 'object') continue;
+      const entries = raw as Record<string, ItemListEntry>;
+      for (const item of field.options ?? []) {
+        const entry = entries[item];
+        if (!entry?.value?.trim()) continue;
+        const key = `${field.id}:${item}`;
+        seenKeys.add(key);
+        if (existingByKey.has(key)) continue;
+        toInsert.push(
+          manager.create(ResponseItem, {
+            id: uuidv4(),
+            response_id: responseId,
+            field_id: field.id,
+            item_label: item,
+            status_id: null,
+            assigned_to: null,
+          }),
+        );
+      }
+    }
+    if (toInsert.length) await manager.save(ResponseItem, toInsert);
+
+    const stale = existing.filter((i) => !seenKeys.has(`${i.field_id}:${i.item_label}`));
+    if (stale.length) await manager.delete(ResponseItem, { id: In(stale.map((i) => i.id)) });
   }
 
   private async lookupMaps(
     responses: EventResponse[],
+    items: ResponseItem[] = [],
   ): Promise<[Map<string, { id: string; name: string; tone: string }>, Map<string, { id: string; name: string }>]> {
-    const statusIds = [...new Set(responses.map((r) => r.status_id).filter((id): id is string => !!id))];
-    const userIds = [...new Set(responses.map((r) => r.assigned_to).filter((id): id is string => !!id))];
+    const statusIds = [
+      ...new Set(
+        [...responses.map((r) => r.status_id), ...items.map((i) => i.status_id)].filter((id): id is string => !!id),
+      ),
+    ];
+    const userIds = [
+      ...new Set(
+        [...responses.map((r) => r.assigned_to), ...items.map((i) => i.assigned_to)].filter(
+          (id): id is string => !!id,
+        ),
+      ),
+    ];
 
     const [statusRows, userRows] = await Promise.all([
       statusIds.length ? this.statuses.find({ where: { id: In(statusIds) } }) : Promise.resolve([]),
@@ -341,6 +522,46 @@ export class EventResponsesService {
     ];
   }
 
+  /** For item_list fields with per-item auto serial numbers enabled: parses the
+   *  entered value as a quantity and, if it's a fresh entry (no codes yet), mints
+   *  that many sequential codes and advances the field's stored cursor. Runs inside
+   *  the caller's transaction so the cursor update is atomic with the response write. */
+  private async assignItemSerialCodes(
+    fields: EventFormField[],
+    values: Record<string, EventFieldValue>,
+    manager: EntityManager,
+  ): Promise<Record<string, EventFieldValue>> {
+    const result = { ...values };
+    for (const field of fields) {
+      if (field.field_type !== EventFieldType.ITEM_LIST || !field.item_serial_config) continue;
+      const raw = result[field.id];
+      if (raw === undefined || Array.isArray(raw) || typeof raw !== 'object') continue;
+
+      const entries = raw as Record<string, ItemListEntry>;
+      const options = field.options ?? [];
+      let fieldChanged = false;
+      const nextConfig = field.item_serial_config.map((cfg, i) => {
+        const item = options[i];
+        const entry = item ? entries[item] : undefined;
+        if (!cfg.enabled || !entry || entry.codes?.length) return cfg;
+        const qty = parseInt(entry.value, 10);
+        if (!Number.isInteger(qty) || qty <= 0) return cfg;
+
+        const codes = Array.from({ length: qty }, (_, k) => `${cfg.prefix}${cfg.next + k}`);
+        entries[item] = { ...entry, codes };
+        fieldChanged = true;
+        return { ...cfg, next: cfg.next + qty };
+      });
+
+      if (fieldChanged) {
+        field.item_serial_config = nextConfig;
+        await manager.save(EventFormField, field);
+      }
+      result[field.id] = entries;
+    }
+    return result;
+  }
+
   private assertRequiredFieldsPresent(fields: EventFormField[], values: Record<string, EventFieldValue>): void {
     const missing = fields.filter((field) => {
       if (!field.is_required) return false;
@@ -348,8 +569,8 @@ export class EventResponsesService {
       if (v === undefined || v === null) return true;
       if (Array.isArray(v)) return v.length === 0;
       if (field.field_type === EventFieldType.ITEM_LIST) {
-        const entries = v as Record<string, string>;
-        return (field.options ?? []).some((item) => !entries[item]?.trim());
+        const entries = v as Record<string, ItemListEntry>;
+        return (field.options ?? []).some((item) => !entries[item]?.value?.trim());
       }
       return (v as string).trim() === '';
     });
@@ -401,8 +622,8 @@ function formatCell(value: EventFieldValue | undefined): string {
   if (value === undefined) return '';
   if (Array.isArray(value)) return value.join('; ');
   if (typeof value === 'object') {
-    return Object.entries(value)
-      .map(([item, v]) => `${item}: ${v}`)
+    return Object.entries(value as Record<string, ItemListEntry>)
+      .map(([item, entry]) => `${item}: ${entry.value}${entry.codes?.length ? ` [${entry.codes.join(', ')}]` : ''}`)
       .join('; ');
   }
   return value;

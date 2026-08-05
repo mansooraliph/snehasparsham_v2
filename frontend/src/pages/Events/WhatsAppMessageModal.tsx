@@ -6,14 +6,14 @@ import { renderTemplate, DEFAULT_MESSAGE_TEMPLATE } from '@/lib/utils/messageTem
 import { buildWhatsAppLink } from '@/lib/utils/whatsapp';
 import type { AdminResponseRow } from '@/api/eventResponses.api';
 import type { EventRecord } from '@/types/event';
-import type { EventFieldValue, EventFormFieldRecord } from '@/types/eventField';
+import type { EventFieldValue, EventFormFieldRecord, ItemListEntry } from '@/types/eventField';
 
 function valueToString(value: EventFieldValue | undefined): string {
   if (value === undefined || value === null) return '';
   if (Array.isArray(value)) return value.join(', ');
   if (typeof value === 'object') {
-    return Object.entries(value)
-      .map(([item, v]) => `${item}: ${v}`)
+    return Object.entries(value as Record<string, ItemListEntry>)
+      .map(([item, entry]) => `${item}: ${entry.value}${entry.codes?.length ? ` [${entry.codes.join(', ')}]` : ''}`)
       .join(', ');
   }
   return value;

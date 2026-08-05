@@ -65,6 +65,30 @@ export class EventResponsesController {
 
   @Roles(...EVENT_ADMIN_ROLES)
   @RequirePermissions(Permission.MANAGE_RESPONSES)
+  @Patch(':responseId/items/:itemId/status')
+  setItemStatus(
+    @Param('eventId') eventId: string,
+    @Param('responseId') responseId: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: SetResponseStatusDto,
+  ) {
+    return this.responses.setItemStatus(eventId, responseId, itemId, dto.statusId ?? null);
+  }
+
+  @Roles(...EVENT_ADMIN_ROLES)
+  @RequirePermissions(Permission.MANAGE_RESPONSES)
+  @Patch(':responseId/items/:itemId/assign')
+  assignItem(
+    @Param('eventId') eventId: string,
+    @Param('responseId') responseId: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: AssignResponseDto,
+  ) {
+    return this.responses.setItemAssignee(eventId, responseId, itemId, dto.userId ?? null);
+  }
+
+  @Roles(...EVENT_ADMIN_ROLES)
+  @RequirePermissions(Permission.MANAGE_RESPONSES)
   @Post('bulk-delete')
   @HttpCode(HttpStatus.OK)
   bulkRemove(@Param('eventId') eventId: string, @Body() dto: BulkDeleteResponsesDto) {

@@ -12,6 +12,7 @@ import { Event } from './database/entities/event.entity';
 import { EventFormField } from './database/entities/event-form-field.entity';
 import { EventResponse } from './database/entities/event-response.entity';
 import { EventResponseValue } from './database/entities/event-response-value.entity';
+import { ResponseItem } from './database/entities/response-item.entity';
 import { ResponseStatus } from './database/entities/response-status.entity';
 import { RoleLabel } from './database/entities/role-label.entity';
 import { AuthModule } from './modules/auth/auth.module';
@@ -43,6 +44,7 @@ import { AppService } from './app.service';
         EventFormField,
         EventResponse,
         EventResponseValue,
+        ResponseItem,
         ResponseStatus,
         RoleLabel,
       ],

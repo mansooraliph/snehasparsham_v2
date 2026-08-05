@@ -12,7 +12,7 @@ import { usersApi } from '@/api/users.api';
 import { getApiErrorMessage } from '@/api/http';
 import { ResponseDetailDrawer } from './ResponseDetailDrawer';
 import { WhatsAppMessageModal } from './WhatsAppMessageModal';
-import type { EventFieldValue } from '@/types/eventField';
+import type { EventFieldValue, ItemListEntry } from '@/types/eventField';
 import type { EventRecord } from '@/types/event';
 import type { ResponseStatusRecord } from '@/types/responseStatus';
 import type { UserRecord } from '@/types/user';
@@ -21,8 +21,8 @@ function formatCell(value: EventFieldValue | undefined): string {
   if (value === undefined || value === null) return '';
   if (Array.isArray(value)) return value.join(', ');
   if (typeof value === 'object') {
-    return Object.entries(value)
-      .map(([item, v]) => `${item}: ${v}`)
+    return Object.entries(value as Record<string, ItemListEntry>)
+      .map(([item, entry]) => `${item}: ${entry.value}${entry.codes?.length ? ` [${entry.codes.join(', ')}]` : ''}`)
       .join('; ');
   }
   return value;
@@ -73,6 +73,18 @@ export function EventResponsesPage() {
   async function handleAssigneeChange(response: AdminResponseRow, userId: string) {
     if (!id) return;
     const updated = await eventResponsesApi.setAssignee(id, response.id, userId || null);
+    patchResponse(updated);
+  }
+
+  async function handleItemStatusChange(response: AdminResponseRow, itemId: string, statusId: string) {
+    if (!id) return;
+    const updated = await eventResponsesApi.setItemStatus(id, response.id, itemId, statusId || null);
+    patchResponse(updated);
+  }
+
+  async function handleItemAssigneeChange(response: AdminResponseRow, itemId: string, userId: string) {
+    if (!id) return;
+    const updated = await eventResponsesApi.setItemAssignee(id, response.id, itemId, userId || null);
     patchResponse(updated);
   }
 
@@ -134,7 +146,11 @@ export function EventResponsesPage() {
       if (statusFilter && response.status?.id !== statusFilter) return false;
       if (assigneeFilter && response.assignee?.id !== assigneeFilter) return false;
       if (!q) return true;
-      const haystack = [response.referenceNumber, ...Object.values(response.values).map(formatCell)]
+      const haystack = [
+        response.referenceNumber,
+        ...Object.values(response.values).map(formatCell),
+        ...response.items.flatMap((i) => [i.itemLabel, i.value, ...i.codes]),
+      ]
         .join(' ')
         .toLowerCase();
       return haystack.includes(q);
@@ -245,9 +261,10 @@ export function EventResponsesPage() {
               </th>
               <th className="px-4 py-3">S.No</th>
               <th className="px-4 py-3" />
+              <th className="whitespace-nowrap px-4 py-3">Reference #</th>
+              <th className="whitespace-nowrap px-4 py-3">Item</th>
               <th className="whitespace-nowrap px-4 py-3">Status</th>
               <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
-              <th className="whitespace-nowrap px-4 py-3">Reference #</th>
               {listing?.fields.map((field) => (
                 <th key={field.id} className="whitespace-nowrap px-4 py-3">
                   {field.label}
@@ -257,94 +274,171 @@ export function EventResponsesPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredResponses.map((response, index) => (
-              <tr key={response.id} className="border-t border-border hover:bg-table-head">
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(response.id)}
-                    onChange={() => toggleSelected(response.id)}
-                    aria-label="Select response"
-                    className="rounded text-blue focus:ring-blue"
-                  />
-                </td>
-                <td className="px-4 py-3 text-text-muted">{index + 1}</td>
-                <td className="px-4 py-3">
-                  <div className="flex justify-start gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openDrawer(response, false)}
-                      aria-label="View response"
-                      className="text-text-faint hover:text-blue"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openDrawer(response, true)}
-                      aria-label="Edit response"
-                      className="text-text-faint hover:text-blue"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWhatsAppResponse(response)}
-                      aria-label="Share on WhatsApp"
-                      className="text-text-faint hover:text-green"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(response)}
-                      aria-label="Delete response"
-                      className="text-text-faint hover:text-red"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
+            {filteredResponses.map((response, index) => {
+              const rowSpan = Math.max(response.items.length, 1);
+
+              function sharedCells() {
+                return (
+                  <>
+                    <td className="px-4 py-3" rowSpan={rowSpan}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(response.id)}
+                        onChange={() => toggleSelected(response.id)}
+                        aria-label="Select response"
+                        className="rounded text-blue focus:ring-blue"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-text-muted" rowSpan={rowSpan}>
+                      {index + 1}
+                    </td>
+                    <td className="px-4 py-3" rowSpan={rowSpan}>
+                      <div className="flex justify-start gap-3">
+                        <button
+                          type="button"
+                          onClick={() => openDrawer(response, false)}
+                          aria-label="View response"
+                          className="text-text-faint hover:text-blue"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDrawer(response, true)}
+                          aria-label="Edit response"
+                          className="text-text-faint hover:text-blue"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWhatsAppResponse(response)}
+                          aria-label="Share on WhatsApp"
+                          className="text-text-faint hover:text-green"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(response)}
+                          aria-label="Delete response"
+                          className="text-text-faint hover:text-red"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted" rowSpan={rowSpan}>
+                      {response.referenceNumber}
+                    </td>
+                  </>
+                );
+              }
+
+              function trailingCells() {
+                return (
+                  <>
+                    {listing?.fields.map((field) => (
+                      <td key={field.id} className="px-4 py-3 text-text-primary" rowSpan={rowSpan}>
+                        {formatCell(response.values[field.id])}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-text-muted" rowSpan={rowSpan}>
+                      {new Date(response.submittedAt).toLocaleString()}
+                    </td>
+                  </>
+                );
+              }
+
+              if (response.items.length === 0) {
+                return (
+                  <tr key={response.id} className="border-t border-border hover:bg-table-head">
+                    {sharedCells()}
+                    <td className="px-4 py-3 text-text-faint">—</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
+                        <select
+                          value={response.status?.id ?? ''}
+                          onChange={(e) => handleStatusChange(response, e.target.value)}
+                          className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                        >
+                          <option value="">—</option>
+                          {statuses.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={response.assignee?.id ?? ''}
+                        onChange={(e) => handleAssigneeChange(response, e.target.value)}
+                        className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                      >
+                        <option value="">Unassigned</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    {trailingCells()}
+                  </tr>
+                );
+              }
+
+              return response.items.map((item, itemIndex) => (
+                <tr
+                  key={item.id}
+                  className={`border-border hover:bg-table-head ${itemIndex === 0 ? 'border-t-2' : 'border-t'}`}
+                >
+                  {itemIndex === 0 && sharedCells()}
+                  <td className="px-4 py-3">
+                    <p className="text-text-primary">{item.itemLabel}</p>
+                    <p className="text-xs text-text-muted">
+                      {item.value}
+                      {item.codes.length ? ` · ${item.codes.join(', ')}` : ''}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      {item.status && <Badge tone={item.status.tone}>{item.status.name}</Badge>}
+                      <select
+                        value={item.status?.id ?? ''}
+                        onChange={(e) => handleItemStatusChange(response, item.id, e.target.value)}
+                        className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                      >
+                        <option value="">—</option>
+                        {statuses.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     <select
-                      value={response.status?.id ?? ''}
-                      onChange={(e) => handleStatusChange(response, e.target.value)}
+                      value={item.assignee?.id ?? ''}
+                      onChange={(e) => handleItemAssigneeChange(response, item.id, e.target.value)}
                       className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
                     >
-                      <option value="">—</option>
-                      {statuses.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
+                      <option value="">Unassigned</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
                         </option>
                       ))}
                     </select>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <select
-                    value={response.assignee?.id ?? ''}
-                    onChange={(e) => handleAssigneeChange(response, e.target.value)}
-                    className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
-                  >
-                    <option value="">Unassigned</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted">{response.referenceNumber}</td>
-                {listing?.fields.map((field) => (
-                  <td key={field.id} className="px-4 py-3 text-text-primary">
-                    {formatCell(response.values[field.id])}
                   </td>
-                ))}
-                <td className="px-4 py-3 text-text-muted">{new Date(response.submittedAt).toLocaleString()}</td>
-              </tr>
-            ))}
+                  {itemIndex === 0 && trailingCells()}
+                </tr>
+              ));
+            })}
           </tbody>
         </table>
 
@@ -411,33 +505,74 @@ export function EventResponsesPage() {
 
             <p className="mt-2 text-xs text-text-faint">{new Date(response.submittedAt).toLocaleString()}</p>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
-              <select
-                value={response.status?.id ?? ''}
-                onChange={(e) => handleStatusChange(response, e.target.value)}
-                className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
-              >
-                <option value="">Status —</option>
-                {statuses.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
+            {response.items.length === 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
+                <select
+                  value={response.status?.id ?? ''}
+                  onChange={(e) => handleStatusChange(response, e.target.value)}
+                  className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                >
+                  <option value="">Status —</option>
+                  {statuses.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={response.assignee?.id ?? ''}
+                  onChange={(e) => handleAssigneeChange(response, e.target.value)}
+                  className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                >
+                  <option value="">Unassigned</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2 border-t border-border pt-3">
+                {response.items.map((item) => (
+                  <div key={item.id} className="rounded-card bg-table-head p-2">
+                    <p className="text-sm text-text-primary">{item.itemLabel}</p>
+                    <p className="text-xs text-text-muted">
+                      {item.value}
+                      {item.codes.length ? ` · ${item.codes.join(', ')}` : ''}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {item.status && <Badge tone={item.status.tone}>{item.status.name}</Badge>}
+                      <select
+                        value={item.status?.id ?? ''}
+                        onChange={(e) => handleItemStatusChange(response, item.id, e.target.value)}
+                        className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                      >
+                        <option value="">Status —</option>
+                        {statuses.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={item.assignee?.id ?? ''}
+                        onChange={(e) => handleItemAssigneeChange(response, item.id, e.target.value)}
+                        className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
+                      >
+                        <option value="">Unassigned</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 ))}
-              </select>
-              <select
-                value={response.assignee?.id ?? ''}
-                onChange={(e) => handleAssigneeChange(response, e.target.value)}
-                className="rounded-card border border-border bg-white px-2 py-1 text-xs text-text-primary focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue"
-              >
-                <option value="">Unassigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              </div>
+            )}
 
             <dl className="mt-3 space-y-1.5 border-t border-border pt-3">
               {listing?.fields.map((field) => (

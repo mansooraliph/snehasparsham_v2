@@ -9,7 +9,18 @@ import { getApiErrorMessage } from '@/api/http';
 import { toHm } from '@/lib/utils/formatTime';
 import { FieldInput } from '@/components/events/FieldInput';
 import type { EventRecord } from '@/types/event';
-import type { EventFieldValue, EventFormFieldRecord } from '@/types/eventField';
+import type { EventFieldValue, EventFormFieldRecord, ItemListEntry } from '@/types/eventField';
+
+function itemCodesFor(fields: EventFormFieldRecord[], values: Record<string, EventFieldValue>) {
+  return fields
+    .filter((f) => f.field_type === 'item_list')
+    .flatMap((f) => {
+      const entries = (values[f.id] as Record<string, ItemListEntry>) ?? {};
+      return Object.entries(entries)
+        .filter(([, entry]) => entry.codes?.length)
+        .map(([item, entry]) => ({ fieldLabel: f.label, item, codes: entry.codes! }));
+    });
+}
 
 export function PublicEventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +31,7 @@ export function PublicEventDetailPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
+  const [submittedValues, setSubmittedValues] = useState<Record<string, EventFieldValue>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -61,6 +73,7 @@ export function PublicEventDetailPage() {
     try {
       const result = await eventResponsesApi.submit(id, values);
       setReferenceNumber(result.referenceNumber);
+      setSubmittedValues(result.values);
     } catch (err) {
       setSubmitError(getApiErrorMessage(err, 'Could not submit the form'));
       setIsSubmitting(false);
@@ -110,6 +123,11 @@ export function PublicEventDetailPage() {
                 {referenceNumber}
               </p>
               <p className="text-xs text-text-muted">Save this number — quote it if you need to follow up.</p>
+              {itemCodesFor(fields, submittedValues).map(({ fieldLabel, item, codes }) => (
+                <p key={`${fieldLabel}-${item}`} className="text-xs text-text-muted">
+                  {item} ({fieldLabel}): <span className="font-mono text-text-primary">{codes.join(', ')}</span>
+                </p>
+              ))}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">

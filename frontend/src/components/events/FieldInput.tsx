@@ -1,5 +1,5 @@
 import { Field, Input, Textarea } from '@/components/ui/Input';
-import type { EventFieldValue, EventFormFieldRecord } from '@/types/eventField';
+import type { EventFieldValue, EventFormFieldRecord, ItemListEntry } from '@/types/eventField';
 
 interface FieldInputProps {
   field: EventFormFieldRecord;
@@ -90,21 +90,30 @@ export function FieldInput({ field, value, onChange, disabled }: FieldInputProps
       );
     }
     case 'item_list': {
-      const entries = (value as Record<string, string>) ?? {};
+      const entries = (value as Record<string, ItemListEntry>) ?? {};
       return (
         <Field label={label}>
           <div className="space-y-2 rounded-card border border-border p-3">
-            {field.options?.map((item) => (
-              <div key={item} className="flex items-center gap-3">
-                <span className="w-1/2 truncate text-sm text-text-primary">{item}</span>
-                <Input
-                  value={entries[item] ?? ''}
-                  onChange={(e) => onChange({ ...entries, [item]: e.target.value })}
-                  required={field.is_required}
-                  disabled={disabled}
-                />
-              </div>
-            ))}
+            {field.options?.map((item, i) => {
+              const entry = entries[item];
+              const serial = field.item_serial_config?.[i];
+              return (
+                <div key={item} className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <span className="w-1/2 truncate text-sm text-text-primary">{item}</span>
+                    <Input
+                      value={entry?.value ?? ''}
+                      onChange={(e) => onChange({ ...entries, [item]: { value: e.target.value } })}
+                      required={field.is_required}
+                      disabled={disabled}
+                    />
+                  </div>
+                  {serial?.enabled && entry?.codes?.length ? (
+                    <p className="text-xs text-text-muted">Assigned: {entry.codes.join(', ')}</p>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </Field>
       );

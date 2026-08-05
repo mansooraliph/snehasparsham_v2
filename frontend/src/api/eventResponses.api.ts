@@ -1,5 +1,5 @@
 import { http } from './http';
-import type { EventFieldValue } from '@/types/eventField';
+import type { EventFieldValue, ResponseItemRow } from '@/types/eventField';
 import type { EventFormFieldRecord } from '@/types/eventField';
 import type { ResponseStatusTone } from '@/types/responseStatus';
 
@@ -10,6 +10,7 @@ export interface AdminResponseRow {
   values: Record<string, EventFieldValue>;
   status: { id: string; name: string; tone: ResponseStatusTone } | null;
   assignee: { id: string; name: string } | null;
+  items: ResponseItemRow[];
 }
 
 export interface EventResponsesListing {
@@ -20,7 +21,12 @@ export interface EventResponsesListing {
 export const eventResponsesApi = {
   /** Public submission — no auth (events-registration-module.md §3.4). */
   submit: (eventId: string, values: Record<string, EventFieldValue>) =>
-    http.post<{ id: string; referenceNumber: string }>(`/events/${eventId}/responses`, { values }).then((r) => r.data),
+    http
+      .post<{ id: string; referenceNumber: string; values: Record<string, EventFieldValue> }>(
+        `/events/${eventId}/responses`,
+        { values },
+      )
+      .then((r) => r.data),
 
   listForEvent: (eventId: string) =>
     http.get<EventResponsesListing>(`/events/${eventId}/responses`).then((r) => r.data),
@@ -38,6 +44,16 @@ export const eventResponsesApi = {
   setAssignee: (eventId: string, responseId: string, userId: string | null) =>
     http
       .patch<AdminResponseRow>(`/events/${eventId}/responses/${responseId}/assign`, { userId })
+      .then((r) => r.data),
+
+  setItemStatus: (eventId: string, responseId: string, itemId: string, statusId: string | null) =>
+    http
+      .patch<AdminResponseRow>(`/events/${eventId}/responses/${responseId}/items/${itemId}/status`, { statusId })
+      .then((r) => r.data),
+
+  setItemAssignee: (eventId: string, responseId: string, itemId: string, userId: string | null) =>
+    http
+      .patch<AdminResponseRow>(`/events/${eventId}/responses/${responseId}/items/${itemId}/assign`, { userId })
       .then((r) => r.data),
 
   remove: (eventId: string, responseId: string) =>
