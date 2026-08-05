@@ -17,11 +17,22 @@ import { WhatsAppMessageModal } from '@/pages/Events/WhatsAppMessageModal';
 import type { AdminResponseRow } from '@/api/eventResponses.api';
 import type { CrossEventResponseRow, ResponseFilters } from '@/types/response';
 import type { EventRecord } from '@/types/event';
-import type { EventFormFieldRecord } from '@/types/eventField';
+import type { EventFieldValue, EventFormFieldRecord, ItemListEntry } from '@/types/eventField';
 import type { ResponseStatusRecord } from '@/types/responseStatus';
 import type { UserRecord } from '@/types/user';
 
 const EMPTY_FILTERS: ResponseFilters = { eventId: '', assigneeId: '', dateFrom: '', dateTo: '' };
+
+function formatCell(value: EventFieldValue | undefined): string {
+  if (value === undefined || value === null) return '';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, ItemListEntry>)
+      .map(([item, entry]) => `${item}: ${entry.value}${entry.codes?.length ? ` [${entry.codes.join(', ')}]` : ''}`)
+      .join('; ');
+  }
+  return value;
+}
 
 export function AllResponsesPage() {
   const navigate = useNavigate();
@@ -57,6 +68,15 @@ export function AllResponsesPage() {
   }
 
   useEffect(() => load(filters), [filters]);
+
+  // Fields aren't included on the cross-event row — load each represented event's
+  // fields so the Name/Mobile column can be resolved for every visible response.
+  useEffect(() => {
+    if (!responses) return;
+    const missing = [...new Set(responses.map((r) => r.event.id))].filter((id) => !(id in fieldsByEvent));
+    if (missing.length) missing.forEach((id) => void ensureFields(id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responses]);
 
   function setFilter<K extends keyof ResponseFilters>(key: K, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -154,6 +174,16 @@ export function AllResponsesPage() {
   }, [responses, search]);
 
   const hasActiveFilters = filters.eventId || filters.assigneeId || filters.dateFrom || filters.dateTo || search;
+
+  // Name/mobile are the fields admins most often need at a glance — auto-detected
+  // per event from field labels, same heuristic as the per-event responses page.
+  function nameAndMobileFields(eventId: string) {
+    const fields = fieldsByEvent[eventId] ?? [];
+    return {
+      nameField: fields.find((f) => /name/i.test(f.label)),
+      mobileField: fields.find((f) => /mobile|phone/i.test(f.label)),
+    };
+  }
 
   return (
     <div className="space-y-4">
@@ -267,6 +297,7 @@ export function AllResponsesPage() {
               <th className="px-4 py-3">S.No</th>
               <th className="px-4 py-3" />
               <th className="px-4 py-3">Event / Reference #</th>
+              <th className="whitespace-nowrap px-4 py-3">Name / Mobile</th>
               <th className="whitespace-nowrap px-4 py-3">Item</th>
               <th className="whitespace-nowrap px-4 py-3">Status</th>
               <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
@@ -275,6 +306,7 @@ export function AllResponsesPage() {
           <tbody>
             {filteredResponses.map((response, index) => {
               const rowSpan = Math.max(response.items.length, 1);
+              const { nameField, mobileField } = nameAndMobileFields(response.event.id);
 
               function sharedCells() {
                 return (
@@ -339,6 +371,13 @@ export function AllResponsesPage() {
                       <p className="font-medium text-text-primary">{response.event.name}</p>
                       <p className="font-mono text-xs text-text-muted">{response.referenceNumber}</p>
                       <p className="text-xs text-text-faint">{new Date(response.submittedAt).toLocaleString()}</p>
+                    </td>
+                    <td className="px-4 py-3 text-text-primary" rowSpan={rowSpan}>
+                      {nameField && <p>{formatCell(response.values[nameField.id]) || '—'}</p>}
+                      {mobileField && (
+                        <p className="text-xs text-text-muted">{formatCell(response.values[mobileField.id]) || '—'}</p>
+                      )}
+                      {!nameField && !mobileField && <span className="text-text-faint">—</span>}
                     </td>
                   </>
                 );
