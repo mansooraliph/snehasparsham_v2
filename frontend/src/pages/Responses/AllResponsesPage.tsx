@@ -266,12 +266,10 @@ export function AllResponsesPage() {
               </th>
               <th className="px-4 py-3">S.No</th>
               <th className="px-4 py-3" />
-              <th className="px-4 py-3">Event</th>
-              <th className="px-4 py-3">Reference #</th>
+              <th className="px-4 py-3">Event / Reference #</th>
               <th className="whitespace-nowrap px-4 py-3">Item</th>
               <th className="whitespace-nowrap px-4 py-3">Status</th>
               <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
-              <th className="px-4 py-3">Submitted At</th>
             </tr>
           </thead>
           <tbody>
@@ -294,7 +292,7 @@ export function AllResponsesPage() {
                       {index + 1}
                     </td>
                     <td className="px-4 py-3" rowSpan={rowSpan}>
-                      <div className="flex items-center justify-start gap-3">
+                      <div className="grid w-fit grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => openDrawer(response, false)}
@@ -337,11 +335,10 @@ export function AllResponsesPage() {
                         </button>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium text-text-primary" rowSpan={rowSpan}>
-                      {response.event.name}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted" rowSpan={rowSpan}>
-                      {response.referenceNumber}
+                    <td className="whitespace-nowrap px-4 py-3" rowSpan={rowSpan}>
+                      <p className="font-medium text-text-primary">{response.event.name}</p>
+                      <p className="font-mono text-xs text-text-muted">{response.referenceNumber}</p>
+                      <p className="text-xs text-text-faint">{new Date(response.submittedAt).toLocaleString()}</p>
                     </td>
                   </>
                 );
@@ -382,9 +379,6 @@ export function AllResponsesPage() {
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-text-muted" rowSpan={rowSpan}>
-                      {new Date(response.submittedAt).toLocaleString()}
                     </td>
                   </tr>
                 );
@@ -434,11 +428,6 @@ export function AllResponsesPage() {
                       ))}
                     </select>
                   </td>
-                  {itemIndex === 0 && (
-                    <td className="whitespace-nowrap px-4 py-3 text-text-muted" rowSpan={rowSpan}>
-                      {new Date(response.submittedAt).toLocaleString()}
-                    </td>
-                  )}
                 </tr>
               ));
             })}

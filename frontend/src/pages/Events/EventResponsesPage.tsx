@@ -139,6 +139,19 @@ export function EventResponsesPage() {
     setDeleteTarget(null);
   }
 
+  // item_list fields already get their own per-item rows/column — no need to also
+  // show their flattened value in a dynamic field column.
+  const listableFields = useMemo(() => listing?.fields.filter((f) => f.field_type !== 'item_list') ?? [], [listing]);
+
+  // Name/mobile are the fields admins most often need at a glance — pull them out
+  // of the generic field-column loop and show them together in one column.
+  const nameField = useMemo(() => listableFields.find((f) => /name/i.test(f.label)), [listableFields]);
+  const mobileField = useMemo(() => listableFields.find((f) => /mobile|phone/i.test(f.label)), [listableFields]);
+  const otherFields = useMemo(
+    () => listableFields.filter((f) => f.id !== nameField?.id && f.id !== mobileField?.id),
+    [listableFields, nameField, mobileField],
+  );
+
   const filteredResponses = useMemo(() => {
     if (!listing) return [];
     const q = search.trim().toLowerCase();
@@ -261,16 +274,22 @@ export function EventResponsesPage() {
               </th>
               <th className="px-4 py-3">S.No</th>
               <th className="px-4 py-3" />
-              <th className="whitespace-nowrap px-4 py-3">Reference #</th>
+              <th className="whitespace-nowrap px-4 py-3">Reference # / Submitted At</th>
+              {(nameField || mobileField) && (
+                <th className="whitespace-nowrap px-4 py-3">
+                  Name / Mobile
+                  {(nameField?.is_required || mobileField?.is_required) && <span className="text-red"> *</span>}
+                </th>
+              )}
               <th className="whitespace-nowrap px-4 py-3">Item</th>
               <th className="whitespace-nowrap px-4 py-3">Status</th>
               <th className="whitespace-nowrap px-4 py-3">Assigned To</th>
-              {listing?.fields.map((field) => (
+              {otherFields.map((field) => (
                 <th key={field.id} className="whitespace-nowrap px-4 py-3">
                   {field.label}
+                  {field.is_required && <span className="text-red"> *</span>}
                 </th>
               ))}
-              <th className="whitespace-nowrap px-4 py-3">Submitted At</th>
             </tr>
           </thead>
           <tbody>
@@ -293,7 +312,7 @@ export function EventResponsesPage() {
                       {index + 1}
                     </td>
                     <td className="px-4 py-3" rowSpan={rowSpan}>
-                      <div className="flex justify-start gap-3">
+                      <div className="grid w-fit grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => openDrawer(response, false)}
@@ -328,9 +347,18 @@ export function EventResponsesPage() {
                         </button>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-text-muted" rowSpan={rowSpan}>
-                      {response.referenceNumber}
+                    <td className="whitespace-nowrap px-4 py-3" rowSpan={rowSpan}>
+                      <p className="font-mono text-xs text-text-muted">{response.referenceNumber}</p>
+                      <p className="text-xs text-text-faint">{new Date(response.submittedAt).toLocaleString()}</p>
                     </td>
+                    {(nameField || mobileField) && (
+                      <td className="px-4 py-3 text-text-primary" rowSpan={rowSpan}>
+                        {nameField && <p>{formatCell(response.values[nameField.id]) || '—'}</p>}
+                        {mobileField && (
+                          <p className="text-xs text-text-muted">{formatCell(response.values[mobileField.id]) || '—'}</p>
+                        )}
+                      </td>
+                    )}
                   </>
                 );
               }
@@ -338,14 +366,11 @@ export function EventResponsesPage() {
               function trailingCells() {
                 return (
                   <>
-                    {listing?.fields.map((field) => (
+                    {otherFields.map((field) => (
                       <td key={field.id} className="px-4 py-3 text-text-primary" rowSpan={rowSpan}>
                         {formatCell(response.values[field.id])}
                       </td>
                     ))}
-                    <td className="px-4 py-3 text-text-muted" rowSpan={rowSpan}>
-                      {new Date(response.submittedAt).toLocaleString()}
-                    </td>
                   </>
                 );
               }
@@ -505,6 +530,16 @@ export function EventResponsesPage() {
 
             <p className="mt-2 text-xs text-text-faint">{new Date(response.submittedAt).toLocaleString()}</p>
 
+            {(nameField || mobileField) && (
+              <p className="mt-1 text-sm text-text-primary">
+                {nameField && formatCell(response.values[nameField.id])}
+                {nameField && mobileField && ' · '}
+                {mobileField && (
+                  <span className="text-text-muted">{formatCell(response.values[mobileField.id])}</span>
+                )}
+              </p>
+            )}
+
             {response.items.length === 0 ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {response.status && <Badge tone={response.status.tone}>{response.status.name}</Badge>}
@@ -575,9 +610,12 @@ export function EventResponsesPage() {
             )}
 
             <dl className="mt-3 space-y-1.5 border-t border-border pt-3">
-              {listing?.fields.map((field) => (
+              {otherFields.map((field) => (
                 <div key={field.id} className="flex justify-between gap-4 text-sm">
-                  <dt className="text-text-muted">{field.label}</dt>
+                  <dt className="text-text-muted">
+                    {field.label}
+                    {field.is_required && <span className="text-red"> *</span>}
+                  </dt>
                   <dd className="text-right text-text-primary">{formatCell(response.values[field.id]) || '—'}</dd>
                 </div>
               ))}
